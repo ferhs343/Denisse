@@ -58,6 +58,8 @@ Una vez especificado los parametros necesarios, Denisse está listo para cazar a
 Tras unos pocos minutos de análisis, Denisse alertará sobre los hallazgos detectados (Sí existen). Además, los flujos de actividad sospechosa serán extraídos en archivos PCAP y registros en formato JSON que contiene todos los datos relevantes del tráfico de red.
 
 ```
+**Ejemplo de salida JSON para detecciones TCP.**
+
 {
   "sessionId": 990,
   "timestamp": "Apr-11,-2025-22:58:26.312539000-CST",
@@ -94,7 +96,7 @@ Como se mencionó anteriormente, Denisse utiliza **`PcapPlusPlus`**, este es una
 
 Al momento de la publicación de Denisse se desconoce si este error ocurre en todos los equipos, sin embargo, sí experimentas de manera persistente este error, sigue los siguientes pasos para dar solución a este error:
 
-  - Al interior de la carpeta de este proyecto, abre con cualquier editor de texto (nano, vim, etc) el siguente archivo: PcapPlusPlus/Pcap++/src/PcapFileDevice.cpp
+  - Al interior de la carpeta de este proyecto, abre con cualquier editor de texto (nano, vim, etc) el siguente archivo: **`PcapPlusPlus/Pcap++/src/PcapFileDevice.cpp`**
 <div align="center">
 <img width="367" alt="image" src="https://github.com/user-attachments/assets/9a715d65-68ef-45e7-8c23-6951fd5dd845" />
 </div>
