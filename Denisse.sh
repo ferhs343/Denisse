@@ -412,12 +412,12 @@ function tcp_hunt() {
 			awk '($3 !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/' \
 			./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
 			src_type="External"; fi
-		    private_and_public; done
+		  private_and_public; done
 }
 
 function udp_hunt() {
 
-	echo "udp para $pcap_file"
+	echo ""
 }
 
 function generate_results_tcp() {
