@@ -417,7 +417,7 @@ function tcp_hunt() {
 
 function udp_hunt() {
 
-	echo ""
+	echo " "
 }
 
 function generate_results_tcp() {
