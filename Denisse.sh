@@ -417,7 +417,7 @@ function tcp_hunt() {
 
 function udp_hunt() {
 
-	echo "udp para $pcap_file"
+	echo ""
 }
 
 function generate_results_tcp() {
