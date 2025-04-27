@@ -1,0 +1,66 @@
+        bool PcapFileWriterDevice::open(bool appendMode)
+        {
+                if (!appendMode)
+                return open();
+
+                m_AppendMode = appendMode;
+
+#if !defined(_WIN32)
+                m_File = fopen(m_FileName.c_str(), "a+");
+#else
+                m_File = fopen(m_FileName.c_str(), "ab+");
+#endif
+
+                if (m_File == nullptr)
+                {
+                        PCPP_LOG_ERROR("Cannot open '" << m_FileName << "' for reading and writing");
+                        return false;
+                }
+ 
+                fseek(m_File, 0, SEEK_END);
+                long fileSize = ftell(m_File);
+                rewind(m_File);
+ 
+                if (fileSize == 0) {
+                        pcap_file_header pcapFileHeader;
+                        pcapFileHeader.magic = 0xa1b2c3d4;
+                        pcapFileHeader.version_major = 2;
+                        pcapFileHeader.version_minor = 4;
+                        pcapFileHeader.thiszone = 0;
+                        pcapFileHeader.sigfigs = 0;
+                        pcapFileHeader.snaplen = 65535;
+                        pcapFileHeader.linktype = static_cast<uint32_t>(m_PcapLinkLayerType);
+ 
+                        fwrite(&pcapFileHeader, sizeof(pcapFileHeader), 1, m_File);
+                        fflush(m_File);
+                } else {
+                        pcap_file_header pcapFileHeader;
+                        int amountRead = fread(&pcapFileHeader, 1, sizeof(pcap_file_header), m_File);
+ 
+                        if (amountRead != sizeof(pcap_file_header))
+                        {
+                                PCPP_LOG_ERROR("Cannot read pcap header from file '" << m_FileName << "'");
+                                closeFile();
+                                return false;
+                        }
+ 
+                        LinkLayerType linkLayerType = static_cast<LinkLayerType>(pcapFileHeader.linktype);
+                        if (linkLayerType != m_PcapLinkLayerType)
+                        {
+                                PCPP_LOG_ERROR("Pcap file has a different link layer type than specified: " << linkLayerType << " vs. " << m_PcapLinkLayerType);
+                                closeFile();
+                                return false;
+                        }
+ 
+                        fseek(m_File, 0, SEEK_END);
+                }
+ 
+                m_PcapDumpHandler = ((pcap_dumper_t*)m_File);
+ 
+                m_NumOfPacketsWritten = 0;
+                m_NumOfPacketsNotWritten = 0;
+                m_DeviceOpened = true;
+ 
+                PCPP_LOG_DEBUG("File writer device for file '" << m_FileName << "' opened successfully in append mode");
+                return true;
+        }
