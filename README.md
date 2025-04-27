@@ -13,7 +13,7 @@
   ------------------------------------------------------------------
 ```
 
-Denisse se desarrolló con el objetivo de encontrar al enemigo oculto en tu red, mediante un análisis profundo de capturas de tráfico, sin importar su tamaño ni complejidad. Su capacidad para procesar grandes volúmenes de datos de manera eficiente la convierte en una herramienta clave para identificar comportamientos anómalos y posibles intrusiones. Actualmente analiza diversos patrones, tales como: 
+Denisse se desarrolló con el objetivo de inspeccionar y analizar profundamente capturas de tráfico en busca del enemigo oculto, sin importar el tamaño ni complejidad del archivo PCAP. Su capacidad para procesar grandes volúmenes de datos de manera eficiente la convierte en una herramienta clave para identificar comportamientos anómalos y posibles intrusiones. Actualmente analiza diversos patrones para identificar diversos TTP, tales como: 
 
   - Examina el flujo a nivel TCP/UDP en busca de escaneos de puertos (Syn, Ack, Fin, Xmas, Maimon, etc), reverse shell, comunicaciones hacia posibles servidores C2, etc.
   - Examina el tráfico DNS en busca de consultas a dominios maliciosos, tunelizado DNS, etc.
@@ -23,7 +23,7 @@ Denisse se desarrolló con el objetivo de encontrar al enemigo oculto en tu red,
 
 **Únicamente es compatible con sistemas basados en Debian.**
 
-## Como utilizar?
+## Uso
 
 Denisse requiere de 3 componentes clave para su funcionamiento, se tiene integrado un instalador para descargar las mismas.
 
@@ -55,15 +55,33 @@ Una vez especificado los parametros necesarios, Denisse está listo para cazar a
 <img width="545" alt="image" src="https://github.com/user-attachments/assets/40341ce5-50d1-4952-9ec4-d6147363f9a4" />
 </div>
 
-Tras unos pocos minutos de análisis, Denisse alertará sobre los hallazgos detectados (Sí hay). Además, los flujos de actividad sospechosa serán extraídos en archivos PCAP y registros en formato JSON que contiene todos los datos relevantes del tráfico de red.
-
-<div align="center">
-<img width="712" alt="image" src="https://github.com/user-attachments/assets/f25afa37-8914-43b3-b051-bade4eb55acf" />
-</div>
-
-<div align="center">
-<img width="1258" alt="image" src="https://github.com/user-attachments/assets/3420f8e8-5a98-4458-b7d4-9c4ac5930afe" />
-</div>
+Tras unos pocos minutos de análisis, Denisse alertará sobre los hallazgos detectados (Sí existen). Además, los flujos de actividad sospechosa serán extraídos en archivos PCAP y registros en formato JSON que contiene todos los datos relevantes del tráfico de red.
+`
+{
+  "sessionId": 990,
+  "timestamp": "Apr-11,-2025-22:58:26.312539000-CST",
+  "sourceIp": "192.168.1.106",
+  "destIp": "192.168.1.254",
+  "portSrc": "56067",
+  "portImpacted": 988,
+  "flagsHistory": "Fin",
+  "packets": 1,
+  "bytes": 0,
+  "connStatus": "Fin-only"
+}
+{
+  "sessionId": 991,
+  "timestamp": "Apr-11,-2025-22:58:28.066969000-CST",
+  "sourceIp": "192.168.1.106",
+  "destIp": "192.168.1.254",
+  "portSrc": "56067",
+  "portImpacted": 996,
+  "flagsHistory": "Fin",
+  "packets": 1,
+  "bytes": 0,
+  "connStatus": "Fin-only"
+}
+`
 
 ## IMPORTANTE: Dato a tener en cuenta
 
