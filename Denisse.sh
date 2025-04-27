@@ -242,35 +242,35 @@ function private_and_public() {
                   c=0
                   #case 2 : 1 ==> N
                   for ((n=0;n<=${#dst[@]} - 1;n++)); do
-                  dst_ip="${dst[$n]}"
-                  n_ports=$(
-                      awk -v status="$status" \
-                          -v src_ip="$src_ip" \
-                          -v dst_ip="$dst_ip" \
-                          '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                          ./Results/.sample1.data | sort -u | wc -l
-                  )
-                  if [ "$n_ports" -gt 10 ]; then
-                      vertical_scan=1; tcp=1
-                      alert="${src_type} ${VPS}"
-                      generate_results_tcp
-                  else
-                      ports=$(
+                      dst_ip="${dst[$n]}"
+                      n_ports=$(
                           awk -v status="$status" \
                               -v src_ip="$src_ip" \
                               -v dst_ip="$dst_ip" \
                               '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                              ./Results/.sample1.data | sort -u
+                              ./Results/.sample1.data | sort -u | wc -l
                       )
-                    if [ "$n" -ne 0 ]; then
-                        if [ "$ports" == "$ports_copy" ]; then
-                            c=$((c+1)); fi; fi
+                      if [ "$n_ports" -gt 10 ]; then
+                          vertical_scan=1; tcp=1
+                          alert="${src_type} ${VPS}"
+                          generate_results_tcp
+                      else
+                          ports=$(
+                              awk -v status="$status" \
+                                  -v src_ip="$src_ip" \
+                                  -v dst_ip="$dst_ip" \
+                                  '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
+                                  ./Results/.sample1.data | sort -u
+                          )
+                        if [ "$n" -ne 0 ]; then
+                            if [ "$ports" == "$ports_copy" ]; then
+                                c=$((c+1)); fi; fi
 
-                    ports_copy="$ports"; fi; done
-                    if [ "$c" -gt 0 ]; then
-                        horizontal_scan=1; tcp=1
-                        alert="${src_type} ${HPS}"
-                        generate_results_tcp; fi; fi; done; fi; done
+                        ports_copy="$ports"; fi; done
+                        if [ "$c" -gt 0 ]; then
+                            horizontal_scan=1; tcp=1
+                            alert="${src_type} ${HPS}"
+                            generate_results_tcp; fi; fi; done; fi; done
 }
 
 function tcp_hunt() {
