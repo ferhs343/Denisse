@@ -57,9 +57,8 @@ Una vez especificado los parametros necesarios, Denisse está listo para cazar a
 
 Tras unos pocos minutos de análisis, Denisse alertará sobre los hallazgos detectados (Sí existen). Además, los flujos de actividad sospechosa serán extraídos en archivos PCAP y registros en formato JSON que contiene todos los datos relevantes del tráfico de red.
 
-```
 **Ejemplo de salida JSON para detecciones TCP.**
-
+```
 {
   "sessionId": 990,
   "timestamp": "Apr-11,-2025-22:58:26.312539000-CST",
