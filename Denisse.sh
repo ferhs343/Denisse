@@ -486,12 +486,12 @@ function analyze_pcap_data() {
     mapfile -t data_file < <(ls -1 ./Results/ 2> /dev/null)
 
     for ((k=0;k<=${#data_file[@]} - 1;k++)); do
-      data="${data_file[$k]}"
-      if [ -s "./Results/$data" ]; then
-          if [ "$data" == "tcp.data" ]; then
-              tcp_hunt
-          elif [ "$data" == "udp.data" ]; then
-              udp_hunt; fi; fi; done
+        data="${data_file[$k]}"
+        if [ -s "./Results/$data" ]; then
+            if [ "$data" == "tcp.data" ]; then
+                tcp_hunt
+            elif [ "$data" == "udp.data" ]; then
+                udp_hunt; fi; fi; done
 }
 
 function analyzer() {
@@ -502,13 +502,13 @@ function analyzer() {
     id=1
 
     for ((i=0;i<=${#t_pcaps[@]} - 1;i++)); do
-      pcap_file="${t_pcaps[$i]}"
-      echo -e "\n [+] Analyzing flow ${i} [${pcap_file}]" | \
-      tee -a .logs.log
-      for ((j=0;j<=${#protos[@]} - 1;j++)); do
-          proto="${protos[$j]}"
-          extract_pcap_data; done
-            analyze_pcap_data; done
+        pcap_file="${t_pcaps[$i]}"
+        echo -e "\n [+] Analyzing flow ${i} [${pcap_file}]" | \
+        tee -a .logs.log
+        for ((j=0;j<=${#protos[@]} - 1;j++)); do
+            proto="${protos[$j]}"
+            extract_pcap_data; done
+              analyze_pcap_data; done
 }
 
 function main() {
@@ -524,11 +524,11 @@ function main() {
       exists=0
 
           for ((i=0;i<=${#pcaps[@]} - 1;i++)); do
-            pcap_file="${pcaps[$i]}"
-            if (( i % 2 != 0 )); then
-                echo " [$i] $(basename $pcap_file)"
-            else
-                echo -n " [$i] $(basename $pcap_file)"; fi; done
+              pcap_file="${pcaps[$i]}"
+              if (( i % 2 != 0 )); then
+                  echo " [$i] $(basename $pcap_file)"
+              else
+                  echo -n " [$i] $(basename $pcap_file)"; fi; done
 
           while [ "$exists" -eq 0 ]; do
               echo -e " \n\n Please, enter a pcap file to be analyzed: "
