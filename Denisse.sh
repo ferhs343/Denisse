@@ -63,16 +63,19 @@ function extract_pcap_data() {
 
     if [ "$proto" == "tcp" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "tcp" -T fields \
-            -e "tcp.stream" -e "frame.time" -e "ip.src" \
+            -o data.show_as_text:TRUE \
+            -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.flags" \
-            -e "tcp.len" -e "tcp.srcport" -e "tcp.dstport" \
+            -e "tcp.len" -e "tcp.srcport" -e "tcp.dstport" -e "data.text"\
             2> /dev/null > ./Results/$proto.data; fi
 
     if [ "$proto" == "udp" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "udp && not icmp" -T fields \
-            -e "udp.stream" -e "frame.time" -e "ip.src" \
+            -o data.show_as_text:TRUE \
+            -e "udp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "udp.length" \
-            -e "udp.srcport" -e "udp.dstport" 2> /dev/null > ./Results/$proto.data
+            -e "udp.srcport" -e "udp.dstport" -e "data.text" \
+            2> /dev/null > ./Results/$proto.data
 
         tshark -r ./Pcaps/Trims/$pcap_file -Y "icmp" -T fields \
             -e "udp.stream" -e "ip.src" -e "ip.dst" \
@@ -81,8 +84,9 @@ function extract_pcap_data() {
 
     if [ "$proto" == "http" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "http" -T fields \
-            -e "tcp.stream" -e "frame.time" -e "ip.src" \
-            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "http.request.method" \
+            -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
+            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
+            -e "tpc.dstport" -e "http.request.method" \
             -e "http.request.full_uri" -e "http.content_type" \
             -e "http.content_length" -e "http.user_agent" \
             -e "http.response.code" -e "tcp.reassembled.data" \
@@ -90,16 +94,18 @@ function extract_pcap_data() {
 
     if [ "$proto" == "dns" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "dns" -T fields \
-            -e "udp.stream" -e "frame.time" -e "ip.src" \
+            -e "udp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" \
-            -e "dns.qry.name" -e "dns.flags" -e "dns.qry.name.len" \
+            -e "udp.srcport" -e "udp.dstport" -e "dns.qry.name" \
+            -e "dns.flags" -e "dns.qry.name.len" \
             -e "dns.resp.type" -e "dns.resp.name" -e "dns.a" \
             -e "dns.aaaa" -e "dns.txt" 2> /dev/null > ./Results/$proto.data; fi
 
     if [ "$proto" == "smb2" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "smb2" -T fields -e \
-            -e "tcp.stream" -e "frame.time" -e "ip.src" \
-            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "smb2.cmd" \
+            -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
+            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" \
+            -e "tcp.srcport" -e "tcp.dstport" -e "smb2.cmd" \
             -e "smb2.tree" -e "smb2.acct" -e "smb2.host" \
             2> /dev/null > ./Results/$proto.data; fi
 }
@@ -286,8 +292,9 @@ function tcp_hunt() {
     vertical_scan=0
     horizontal_scan=0
 
-    tr ' ' '-' <./Results/"$data" | awk '
-        function flag_name(f) {
+    awk '
+        function flag_name(f) 
+        {
             if (f ~ /02$/) return "Syn"
             else if (f ~ /12$/) return "SynAck"
             else if (f ~ /10$/) return "Ack"
@@ -302,11 +309,13 @@ function tcp_hunt() {
             return "NPI"
         }
 
-        function get_status(s) {
+        function get_status(s) 
+        {
             has_syn = has_synack = has_ack = has_rst = has_rstack = has_fin = has_finack = has_null = has_push = has_pushack = has_xmas = 0
             split(flags_list[s], arr, " ")
 
-            for (i in arr) {
+            for (i in arr) 
+            {
                 if (arr[i] == "Syn") has_syn = 1
                 else if (arr[i] == "SynAck") has_synack = 1
                 else if (arr[i] == "Ack") has_ack = 1
@@ -379,30 +388,41 @@ function tcp_hunt() {
         {
             session = $1
 
-            if (!(session in seen)) {
+            if (!(session in seen)) 
+            {
                 seen[session] = $0
                 src_ip[session] = $3
                 dst_ip[session] = $4
             }
 
-            if (!(session in seen)) {
+            if (!(session in timestamp_start)) 
+            {
+                timestamp_start[session] = $2
+            }
+            timestamp_end[session] = $2
+
+            if (!(session in seen)) 
+            {
                 seen[session] = $0
             }
 
             flag_key = session "|" $5
 
-            if (!(flag_key in flag_seen)) {
+            if (!(flag_key in flag_seen)) 
+            {
                 flag_seen[flag_key] = 1
                 fname = flag_name($5)
                 flags_list[session] = flags_list[session] " " fname
             }
 
-            if ($3 == src_ip[session]) {
+            if ($3 == src_ip[session]) 
+            {
                 src_size[session] += $6
                 src_pkts[session] ++
             }
 
-            if ($3 == dst_ip[session]) {
+            if ($3 == dst_ip[session]) 
+            {
                 dst_size[session] += $6
                 dst_pkts[session] ++
             }
@@ -410,21 +430,52 @@ function tcp_hunt() {
             total_size[session] += $6
             total_pkts[session] ++
 
+            if (NF > 8) 
+            {
+                payload = ""
+                for (i = 9; i <= NF; i++) 
+                {
+                    payload = (payload == "") ? $i : payload ";" $i
+                }
+
+                if (payloads[session] == "") 
+                {
+                    payloads[session] = "[" payload 
+
+                } 
+                else 
+                {
+                    payloads[session] = payloads[session] ";" payload
+                }
+            }
         }
 
-        END {
-            for (s in seen) {
+        END 
+        {
+            for (s in seen) 
+            {
                 split(seen[s], fields)
                 status = get_status(s)
+                duration = timestamp_end[s] - timestamp_start[s]
+
+                if (payloads[s] != "") 
+                {
+                    payloads[s] = payloads[s] "]"
+
+                } 
+                else 
+                {
+                    payloads[s] = "[]"
+                }
 
                 gsub(/^ +| +$/, "", flags_list[s])
-                gsub(/ +/, ",", flags_list[s])
+                gsub(/ +/, ";", flags_list[s])
 
                 print fields[1], fields[2], fields[3], fields[4], fields[7], 
-                fields[8], flags_list[s], total_pkts[s], src_pkts[s], dst_pkts[s], 
-                total_size[s], src_size[s], dst_size[s], status
+                fields[8], flags_list[s], total_pkts[s]+0, src_pkts[s]+0, dst_pkts[s]+0, 
+                total_size[s]+0, src_size[s]+0, dst_size[s]+0, duration, payloads[s], status
             }
-        }' > ./Results/.sample.data
+        }' ./Results/"$data" > ./Results/.sample.data
 
     for ((it = 0; it < 2; ++it)); do
         if [ "$it" -eq 0 ]; then
@@ -447,8 +498,6 @@ function udp_hunt() {
         awk '{print $1 " " $3 " " $5 " " $6 " " $7 " " $8 " " $9}' \
         2>/dev/null > ./Results/tr_icmp_udp1.data; fi
 
-    tr ' ' '-' < ./Results/$data > ./Results/.sample.data
-
     awk '
         FNR==NR {
             key = $1 FS $2 FS $3 FS $4 FS $5
@@ -463,42 +512,146 @@ function udp_hunt() {
             else
                 print $0, "NA NA"
         }
-    ' ./Results/tr_icmp_udp1.data ./Results/.sample.data > ./Results/.sample1.data
+    ' ./Results/tr_icmp_udp1.data ./Results/$data > ./Results/.sample.data
 
     awk '
+        function icmp_flag_name(type, code) 
+        {
+            if (type == 3) 
+            {
+                if (code == 3) return "port-unreachable"
+                else return "unreachable"
+            }
+
+            else return "other"
+        }
+
+        function get_icmp_status(s) 
+        {
+            has_unreachable = 0
+            split(icmp_flags_list[s], arr, " ")
+
+            for (i in arr) 
+            {
+                if (arr[i] == "port-unreachable") has_unreachable = 1
+            }
+
+            if (has_unreachable) return "Unreachable"
+            return "NPI"
+        }
+
         {
             fwd_key = $3 " " $4 " " $6 " " $7
             rev_key = $4 " " $3 " " $7 " " $6
 
-            if (!(fwd_key in first_seen) && !(rev_key in first_seen)) {
-                first_seen[fwd_key] = $0
-                session_id[fwd_key] = $1
-                timestamp[fwd_key] = $2
+            if (!(fwd_key in first_seen) && !(rev_key in first_seen)) 
+            {
+                key = fwd_key
+                first_seen[key] = $0
+                session_id[key] = $1
+                timestamp[key] = $2
+
+            } 
+            else 
+            {
+                key = (fwd_key in first_seen) ? fwd_key : rev_key
             }
 
-            if (fwd_key in first_seen) {
-                src_size[fwd_key] += $5
-                src_pkts[fwd_key] ++
-                
-            } else if (rev_key in first_seen) {
-                dst_size[rev_key] += $5
-                dst_pkts[rev_key] ++
+            if (!(key in src_ip)) 
+            {
+                split(key, parts, " ")
+                src_ip[key] = parts[1]
+                dst_ip[key] = parts[2]
+                src_port[key] = parts[3]
+                dst_port[key] = parts[4]
+            }
+
+            if ($3 == src_ip[key]) 
+            {
+                src_size[key] += $5
+                src_pkts[key] ++
+
+            } 
+            else 
+            {
+                dst_size[key] += $5
+                dst_pkts[key] ++
+            }
+
+            total_size[key] += $5
+            total_pkts[key]++
+
+            if (!(key in timestamp_start)) 
+            {
+                timestamp_start[key] = $2
+            }
+            timestamp_end[key] = $2
+
+            if ($(NF - 1) ~ /^[0-9]+$/ && $NF ~ /^[0-9]+$/) 
+            {
+                icmp_type_val = $(NF - 1)
+                icmp_code_val = $NF
+
+                if (!(key in icmp_type_first)) 
+                {
+                    icmp_type_first[key] = icmp_type_val
+                    icmp_code_first[key] = icmp_code_val
+                }
+
+                flag_key = key "|" icmp_type_val "|" icmp_code_val
+                if (!(flag_key in flag_seen)) 
+                {
+                    flag_seen[flag_key] = 1
+                    fname = icmp_flag_name(icmp_type_val, icmp_code_val)
+                    icmp_flags_list[key] = icmp_flags_list[key] " " fname
+                }
+            }
+
+            if (NF > 9) 
+            {
+                payload = ""
+                for (i = 8; i < NF - 1; i++) 
+                {
+                    payload = (payload == "") ? $i : payload ";" $i
+                }
+
+                if (payloads[key] == "") 
+                {
+                    payloads[key] = "[" payload
+
+                } 
+                else 
+                {
+                    payloads[key] = payloads[key] ";" payload
+                }
             }
         }
 
-        END {
-            for (k in first_seen) {
-                split(k, fields, " ")
+        END 
+        {
+            for (k in first_seen) 
+            {
+                icmp_type_out = (k in icmp_type_first) ? icmp_type_first[k] : "NA"
+                icmp_code_out = (k in icmp_code_first) ? icmp_code_first[k] : "NA"
+                status = get_icmp_status(k)
+                duration = (timestamp_end[k] - timestamp_start[k])
 
-                total_size = (src_size[k] + 0) + (dst_size[k] + 0)
-                total_pkts = (src_pkts[k] + 0) + (dst_pkts[k] + 0)
+                if (payloads[k] != "") 
+                {
+                    payloads[k] = payloads[k] "]"
 
-                print session_id[k], timestamp[k], fields[1], fields[2], 
-                fields[3], fields[4], total_pkts, src_pkts[k]+0, dst_pkts[k]+0, 
-                total_size, src_size[k]+0, dst_size[k]+0
+                } 
+                else 
+                {
+                    payloads[k] = "[]"
+                }
+
+                print session_id[k], timestamp[k], src_ip[k], dst_ip[k], src_port[k], 
+                dst_port[k], total_pkts[k]+0, src_pkts[k]+0, dst_pkts[k]+0, total_size[k]+0, 
+                src_size[k]+0, dst_size[k]+0, icmp_type_out, icmp_code_out, duration, payloads[k], status
             }
         }
-    './Results/.sample1.data
+    ' ./Results/.sample.data > ./Results/.sample1.data
 
     echo "udp" && sleep 5
 
