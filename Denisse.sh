@@ -814,7 +814,7 @@ function analyzer() {
 function main() {
 
     clear && banner
-    chmod a+rw ./Results/ && chmod -R a+rw ./Pcaps/
+    chmod a+rw ./Results/ && chmod -R a+rw ./Pcaps/ && chmod a+rw ./Databases/
     echo -e "\n [*] Stored pcaps: \n"
 
     echo -e "\n$(
