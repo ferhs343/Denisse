@@ -2,6 +2,8 @@
 
 source Errors.sh
 source Alerts.sh
+source Json_logs.sh
+source DB_Tables.sh
 
 dependencies=(
     "tshark"
@@ -16,6 +18,7 @@ dependencies=(
     "libssl-dev"
     "libboost-all-dev"
     "PcapPlusPlus"
+    "sqlite3"
 )
 
 arg1=$1
@@ -63,18 +66,16 @@ function extract_pcap_data() {
 
     if [ "$proto" == "tcp" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "tcp" -T fields \
-            -o data.show_as_text:TRUE \
             -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.flags" \
-            -e "tcp.len" -e "tcp.srcport" -e "tcp.dstport" -e "data.text"\
+            -e "tcp.len" -e "tcp.srcport" -e "tcp.dstport" -e "data"\
             2> /dev/null > ./Results/$proto.data; fi
 
     if [ "$proto" == "udp" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "udp && not icmp" -T fields \
-            -o data.show_as_text:TRUE \
             -e "udp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "udp.length" \
-            -e "udp.srcport" -e "udp.dstport" -e "data.text" \
+            -e "udp.srcport" -e "udp.dstport" -e "data" \
             2> /dev/null > ./Results/$proto.data
 
         tshark -r ./Pcaps/Trims/$pcap_file -Y "icmp" -T fields \
@@ -108,6 +109,18 @@ function extract_pcap_data() {
             -e "tcp.srcport" -e "tcp.dstport" -e "smb2.cmd" \
             -e "smb2.tree" -e "smb2.acct" -e "smb2.host" \
             2> /dev/null > ./Results/$proto.data; fi
+}
+
+function LocToLoc_regex() {
+
+    awk '($3 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/ && $4 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/)' \
+    ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
+}
+
+function PubToLoc_regex() {
+
+    awk '($3 !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/' \
+    ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
 }
 
 function check_dependencies() {
@@ -284,13 +297,27 @@ function private_and_public() {
                         fi; done; fi; done
 }
 
-function tcp_hunt() {
+function tcp_data_analysis() {
 
     sessions=()
     alert=""
     src_type=""
     vertical_scan=0
     horizontal_scan=0
+
+    for ((it = 0; it < 2; ++it)); do
+        if [ "$it" -eq 0 ]; then
+            LocToLoc_regex
+            src_type="Internal"
+        else
+            PubToLoc_regex
+            src_type="External"; fi 
+            private_and_public; done
+
+    #echo "yaaaaaaaaaaaaa" && sleep 3
+}
+
+function parse_tcp_data() {
 
     awk '
         function flag_name(f) 
@@ -399,6 +426,7 @@ function tcp_hunt() {
             {
                 timestamp_start[session] = $2
             }
+            
             timestamp_end[session] = $2
 
             if (!(session in seen)) 
@@ -441,7 +469,6 @@ function tcp_hunt() {
                 if (payloads[session] == "") 
                 {
                     payloads[session] = "[" payload 
-
                 } 
                 else 
                 {
@@ -450,8 +477,7 @@ function tcp_hunt() {
             }
         }
 
-        END 
-        {
+        END {
             for (s in seen) 
             {
                 split(seen[s], fields)
@@ -461,11 +487,10 @@ function tcp_hunt() {
                 if (payloads[s] != "") 
                 {
                     payloads[s] = payloads[s] "]"
-
                 } 
                 else 
                 {
-                    payloads[s] = "[]"
+                    payloads[s] = "[Null]"
                 }
 
                 gsub(/^ +| +$/, "", flags_list[s])
@@ -476,37 +501,50 @@ function tcp_hunt() {
                 total_size[s]+0, src_size[s]+0, dst_size[s]+0, duration, payloads[s], status
             }
         }' ./Results/"$data" > ./Results/.sample.data
+}
+
+function udp_data_analysis() {
+
+    #echo "udp" && sleep 5
 
     for ((it = 0; it < 2; ++it)); do
         if [ "$it" -eq 0 ]; then
-            awk '($3 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/ && $4 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/)' \
-            ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
+            LocToLoc_regex
             src_type="Internal"
         else
-            awk '($3 !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/' \
-            ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
-            src_type="External"; fi 
+            PubToLoc_regex
+            src_type="External"; fi
             private_and_public; done
-
-    echo "yaaaaaaaaaaaaa" && sleep 3
 }
 
-function udp_hunt() {
+function parse_udp_data() {
 
     if [ -s "./Results/tr_icmp_udp.data" ]; then
         tr ',' ' ' < ./Results/tr_icmp_udp.data | \
         awk '{print $1 " " $3 " " $5 " " $6 " " $7 " " $8 " " $9}' \
-        2>/dev/null > ./Results/tr_icmp_udp1.data; fi
+        2>/dev/null > ./Results/tr_icmp_udp1.data
+    else
+        echo "0 0.0.0.0 0.0.0.0 1 1 3 3" > ./Results/tr_icmp_udp1.data; fi
 
     awk '
+        #first data file ==> icmp data
+
         FNR==NR {
+            #key ==> session_id, src_ip, dst_ip, src_port, dst_port
             key = $1 FS $2 FS $3 FS $4 FS $5
+
+            #value key ==> icmp_type, icmp_code
             extra[key] = $6 FS $7
+
             next
         }
 
+        #second data file ==> udp data (without icmp data)
+
         {
+            #key ==> session_id, src_ip, dst_ip, src_port, dst_port
             key = $1 FS $3 FS $4 FS $6 FS $7
+
             if (key in extra)
                 print $0, extra[key]
             else
@@ -517,7 +555,7 @@ function udp_hunt() {
     awk '
         function icmp_flag_name(type, code) 
         {
-            if (type == 3) 
+            if (type == 3)
             {
                 if (code == 3) return "port-unreachable"
                 else return "unreachable"
@@ -541,7 +579,9 @@ function udp_hunt() {
         }
 
         {
+            #key 1 ==> src_ip, dst_ip, src_port, dst_port (A -> B)
             fwd_key = $3 " " $4 " " $6 " " $7
+            #key 2 ==> dst_ip, src_ip, dst_port, src_port (B -> A)
             rev_key = $4 " " $3 " " $7 " " $6
 
             if (!(fwd_key in first_seen) && !(rev_key in first_seen)) 
@@ -550,7 +590,6 @@ function udp_hunt() {
                 first_seen[key] = $0
                 session_id[key] = $1
                 timestamp[key] = $2
-
             } 
             else 
             {
@@ -570,7 +609,6 @@ function udp_hunt() {
             {
                 src_size[key] += $5
                 src_pkts[key] ++
-
             } 
             else 
             {
@@ -579,12 +617,13 @@ function udp_hunt() {
             }
 
             total_size[key] += $5
-            total_pkts[key]++
+            total_pkts[key] ++
 
             if (!(key in timestamp_start)) 
             {
                 timestamp_start[key] = $2
             }
+
             timestamp_end[key] = $2
 
             if ($(NF - 1) ~ /^[0-9]+$/ && $NF ~ /^[0-9]+$/) 
@@ -607,7 +646,7 @@ function udp_hunt() {
                 }
             }
 
-            if (NF > 9) 
+            if (NF > 9)
             {
                 payload = ""
                 for (i = 8; i < NF - 1; i++) 
@@ -618,7 +657,6 @@ function udp_hunt() {
                 if (payloads[key] == "") 
                 {
                     payloads[key] = "[" payload
-
                 } 
                 else 
                 {
@@ -627,8 +665,7 @@ function udp_hunt() {
             }
         }
 
-        END 
-        {
+        END {
             for (k in first_seen) 
             {
                 icmp_type_out = (k in icmp_type_first) ? icmp_type_first[k] : "NA"
@@ -639,11 +676,10 @@ function udp_hunt() {
                 if (payloads[k] != "") 
                 {
                     payloads[k] = payloads[k] "]"
-
                 } 
                 else 
                 {
-                    payloads[k] = "[]"
+                    payloads[k] = "[Null]"
                 }
 
                 print session_id[k], timestamp[k], src_ip[k], dst_ip[k], src_port[k], 
@@ -652,19 +688,6 @@ function udp_hunt() {
             }
         }
     ' ./Results/.sample.data > ./Results/.sample1.data
-
-    echo "udp" && sleep 5
-
-    for ((it = 0; it < 2; ++it)); do
-        if [ "$it" -eq 0 ]; then
-            awk '($3 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/ && $4 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/)' \
-            ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
-            src_type="Internal"
-        else
-            awk '($3 !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/' \
-            ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
-            src_type="External"; fi
-            private_and_public; done
 }
 
 function generate_results_tcp() {
@@ -715,43 +738,27 @@ function generate_results_tcp() {
 
             filter_json+="$stream|"; fi; done
 
-    output_pcap="ALERT_INFO_${id}_.pcap"
-    output_json="ALERT_INFO_${type}_${id}_.json"
+    output_pcap="ALERT_INFO_${id_result}_.pcap"
+    output_json="ALERT_INFO_${type}_${id_result}_.json"
     awk -v pattern="^($filter_json)$" '$1 ~ pattern' ./Results/.sample.data \
-    >./Results/.sample2.data
+    > ./Results/.result_logs.data
     generate_json_logs
 
     tshark -r ./Pcaps/Trims/$pcap_file -Y "${filter_pcap}" \
     -w "./Results/${output_pcap}" 2> /dev/null
 
-    echo -e "\n\t [!] [$alert] ==> [$output_pcap] [${json_logs[*]}]" | \
+    echo -e "\n\t [!] [$alert] ==> [$output_pcap] [$output_json]" | \
     tee -a .logs.log
-    id=$((id + 1))
+    id_result=$((id_result + 1))
 }
 
 function generate_json_logs() {
 
-    json_logs=()
     if [ "$tcp" -eq 1 ]; then
-        type="tcp"
+        tcp_json_logs "$output_json"; fi
 
-        awk '{
-            json = "{"
-            json = json " \"sessionId\": " $1
-            json = json ", \"timestamp\": \"" $2 "\""
-            json = json ", \"sourceIp\": \"" $3 "\""
-            json = json ", \"destIp\": \"" $4 "\""
-            json = json ", \"portSrc\": \"" $5 "\""
-            json = json ", \"portImpacted\": " $6
-            json = json ", \"flagsHistory\": \"" $7 "\""
-            json = json ", \"packets\": " $8
-            json = json ", \"bytes\": " $9
-            json = json ", \"connStatus\": \"" $10 "\""
-            json = json " }"
-            print json
-        }' ./Results/.sample2.data > ./Results/$output_json
-
-        json_logs+=("$output_json"); fi
+    if [ "$udp" -eq 1 ]; then
+        udp_json_logs "$output_json"; fi
 }
 
 function analyze_pcap_data() {
@@ -766,9 +773,15 @@ function analyze_pcap_data() {
         data="${data_file[$k]}"
         if [ -s "./Results/$data" ]; then
             if [ "$data" == "tcp.data" ]; then
-                tcp_hunt
+                type="tcp"
+                parse_tcp_data
+                import_tcp_data "$flow_id" "$file_db"
+                tcp_data_analysis
             elif [ "$data" == "udp.data" ]; then
-                udp_hunt; fi; fi; done
+                type="udp"
+                parse_udp_data
+                import_udp_data "$flow_id" "$file_db"
+                udp_data_analysis; fi; fi; done
 }
 
 function analyzer() {
@@ -776,16 +789,26 @@ function analyzer() {
     mapfile -t t_pcaps < <(ls -1 ./Pcaps/Trims/ | grep "^[0-9]" 2> /dev/null)
     echo -e "\n [+] Sessions joined in [${t_pcaps[*]}]" >> .logs.log
     echo -e "\n [+] Flows to analyze ==> ${#t_pcaps[@]}" | tee -a .logs.log
-    id=1
+
+    id_result=1
+    flow_id=""
+    id_db=0
+    file_db="Database_${id_db}.db"
+
+    while [ -e "$file_db" ]; do
+        id_db=$((id_db + 1))
+        file_db="Database_${id_db}.db"; done
 
     for ((i = 0; i <= ${#t_pcaps[@]} - 1; i++)); do
         pcap_file="${t_pcaps[$i]}"
-        echo -e "\n [+] Analyzing flow ${i} [${pcap_file}]" | \
+        flow_id=$i
+        echo -e "\n [+] Analyzing flow ${flow_id} [${pcap_file}]" | \
         tee -a .logs.log
         for ((j = 0; j <= ${#protos[@]} - 1; j++)); do
             proto="${protos[$j]}"
             extract_pcap_data; done
-            analyze_pcap_data; done
+            analyze_pcap_data
+            rm ./Results/*.data; done
 }
 
 function main() {
