@@ -1,13 +1,18 @@
 #!/bin/bash
 
+# Denisse v.1.0.0
+# By: Luis Fernando Herrera - luis.herrera@scitum.com.mx
+
 source Errors.sh
 source Alerts.sh
-source Json_logs.sh
+source Json_Logs.sh
 source DB_Tables.sh
+
+red="\e[0;31m\033[1m"
+default="\033[0m\e[0m"
 
 dependencies=(
     "tshark"
-    "mergecap"
     "cmake"
     "g++"
     "dpkg"
@@ -18,7 +23,6 @@ dependencies=(
     "libssl-dev"
     "libboost-all-dev"
     "PcapPlusPlus"
-    "sqlite3"
 )
 
 arg1=$1
@@ -26,7 +30,7 @@ arg2=$2
 
 function show_help() {
 
-    echo -e "\n Denisse V.1.0.0"
+    echo -e "\n Denisse v.1.0.0"
     echo -e "\n Usage: ./Tool.sh [OPTION] \n"
     echo -e "\n [OPTIONS]"
     echo -e "\n     --help        |  -h : Show this panel."
@@ -87,11 +91,36 @@ function extract_pcap_data() {
         tshark -r ./Pcaps/Trims/$pcap_file -Y "http" -T fields \
             -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
-            -e "tpc.dstport" -e "http.request.method" \
+            -e "tcp.dstport" -e "http.request.method" \
             -e "http.request.full_uri" -e "http.content_type" \
             -e "http.content_length" -e "http.user_agent" \
-            -e "http.response.code" -e "tcp.reassembled.data" \
-            -e "http.file_data" 2> /dev/null > ./Results/$proto.data; fi
+            -e "http.response.code" -e "http.file_data" 2> /dev/null | \
+            awk -F'\t' '
+                {
+                    for (i = 1; i <= NF; i++)
+                    {
+                        if (i == "") $i = "Null"
+                    }
+
+                    OFS="\t"; print
+                }' > ./Results/$proto.data
+                
+        tshark -r ./Pcaps/Trims/$pcap_file -Y "http2" -T fields \
+            -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
+            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
+            -e "tcp.dstport" -e "http2.headers.method" \
+            -e "http2.headers.path" -e "http2.headers.content_type" \
+            -e "http2.headers.content_length" -e "http2.headers.user_agent" \
+            -e "http2.headers.status" -e "http2.data.data" 2> /dev/null | \
+            awk -F'\t' '
+                {
+                    for (i = 1; i <= NF; i++)
+                    {
+                        if (i == "") $i = "Null"
+                    }
+
+                    OFS="\t"; print
+                }' > "./Results/${proto}2.data"; fi
 
     if [ "$proto" == "dns" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "dns" -T fields \
@@ -114,13 +143,13 @@ function extract_pcap_data() {
 function LocToLoc_regex() {
 
     awk '($3 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/ && $4 ~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/)' \
-    ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
+    ./Results/$filename 2> /dev/null > ./Results/$filename.tmp
 }
 
 function PubToLoc_regex() {
 
     awk '($3 !~ /^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|fd[0-9a-f]{2}:|fc[0-9a-f]{2}:)/' \
-    ./Results/.sample.data 2> /dev/null > ./Results/.sample1.data
+    ./Results/$filename 2> /dev/null > ./Results/$filename.tmp
 }
 
 function check_dependencies() {
@@ -131,19 +160,19 @@ function check_dependencies() {
         dep="${dependencies[$i]}"
 
         if [[ "$i" -ge 0 &&
-              "$i" -le 6 ]]; then
+              "$i" -le 5 ]]; then
             if ! command -v $dep &> /dev/null; then
                 remove=1; fi
 
-        elif [[ "$i" -ge 7 &&
-                "$i" -le 10 ]]; then
+        elif [[ "$i" -ge 6 &&
+                "$i" -le 9 ]]; then
             if ! command -v dpkg &> /dev/null; then
                 remove=1
             else
                 if ! dpkg -s $dep &> /dev/null; then
                     remove=1; fi; fi
 
-        elif [ "$i" -eq 11 ]; then
+        elif [ "$i" -eq 10 ]; then
             if ! ls /usr/local/include/ | grep -i "${dep}" \
                 &> /dev/null; then
                 remove=1; fi; fi
@@ -177,7 +206,7 @@ function install_dependencies() {
             if cmake .. &> /dev/null; then
                 control2=$((control2 + 1)); fi
 
-            cd..
+            cd ..
             if make install &> /dev/null; then
                 control2=$((control2 + 1)); fi
 
@@ -194,7 +223,7 @@ function install_dependencies() {
 
 function private_and_public() {
 
-    conn_status=($(awk '{print $NF}' ./Results/.sample1.data | sort -u))
+    conn_status=($(awk '{print $NF}' ./Results/$filename.tmp | sort -u))
     src=()
     dst=()
 
@@ -202,14 +231,14 @@ function private_and_public() {
 
     for ((l = 0; l <= ${#conn_status[@]} - 1; l++)); do
         status="${conn_status[$l]}"
-        if [[ ("$data" == "tcp.data" && ("$status" != "NPI" &&
+        if [[ ("$filename" == tcp_* && ("$status" != "NPI" &&
                "$status" != "Finished-payload" &&
                "$status" != "Reseted-payload")) ||
-              ("$data" == "udp.data" && ("$status" == "Established")) 
+              ("$filename" == udp_* && ("$status" == "Established")) 
             ]]; then
             src=($(
                 awk -v status="$status" '$NF == status {print $3}' \
-                    ./Results/.sample1.data | sort | uniq -c | sort -rn |
+                    ./Results/$filename.tmp | sort | uniq -c | sort -rn |
                     awk '$1 > 2 {print $2}'
             ))
             for ((m = 0; m <= ${#src[@]} - 1; m++)); do
@@ -218,7 +247,7 @@ function private_and_public() {
                     awk -v status="$status" \
                         -v src_ip="$src_ip" \
                         '$NF == status && $3 == src_ip {print $4}' \
-                        ./Results/.sample1.data | sort -u
+                        ./Results/$filename.tmp | sort -u
                 ))
                 #case 1 : 1 ==> 1
                 if [ ${#dst[@]} -eq 1 ]; then
@@ -228,14 +257,14 @@ function private_and_public() {
                             -v src_ip="$src_ip" \
                             -v dst_ip="$dst_ip" \
                             '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                            ./Results/.sample1.data | sort -u | wc -l
+                            ./Results/$filename.tmp | sort -u | wc -l
                     )
 
                     echo -e "\n [+] TCP/UDP Vertical Scan proof - No. Ports ==> [$n_ports]" >> .logs.log
 
                     if [ "$n_ports" -gt 10 ]; then
                         vertical_scan=1
-                        tcp=1
+                        if [[ "$filename" == tcp_* ]]; then tcp=1; else udp=1; fi
                         alert="${src_type} ${VPS}"
                         generate_results_tcp "$dst_ip"; fi
                 else
@@ -248,14 +277,14 @@ function private_and_public() {
                                 -v src_ip="$src_ip" \
                                 -v dst_ip="$dst_ip" \
                                 '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                                ./Results/.sample1.data | sort -u | wc -l
+                                ./Results/$filename.tmp | sort -u | wc -l
                         )
 
                         echo -e "\n [+] TCP/UDP Vertical Scan proof - No. Ports ==> [$n_ports]" >> .logs.log
 
                         if [ "$n_ports" -gt 10 ]; then
                             vertical_scan=1
-                            if [ "$data" == "tcp.data" ]; then tcp=1; else udp=1; fi
+                            if [[ "$filename" == tcp_* ]]; then tcp=1; else udp=1; fi
                             alert="${src_type} ${VPS}"
                             generate_results_tcp "$dst_ip"
                         else
@@ -264,7 +293,7 @@ function private_and_public() {
                                     -v src_ip="$src_ip" \
                                     -v dst_ip="$dst_ip" \
                                     '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                                    ./Results/.sample1.data | sort -u
+                                    ./Results/$filename.tmp | sort -u
                             )
                             ports_a+=("$ports"); fi; done
 
@@ -291,7 +320,7 @@ function private_and_public() {
 
                     if [ "${#multiple_dst[@]}" -gt 0 ]; then
                         horizontal_scan=1
-                        if [ "$data" == "tcp.data" ]; then tcp=1; else udp=1; fi
+                        if [[ "$filename" == tcp_* ]]; then tcp=1; else udp=1; fi
                         alert="${src_type} ${HPS}"
                         generate_results_tcp "${multiple_dst[@]}"; fi
                         fi; done; fi; done
@@ -500,7 +529,7 @@ function parse_tcp_data() {
                 fields[8], flags_list[s], total_pkts[s]+0, src_pkts[s]+0, dst_pkts[s]+0, 
                 total_size[s]+0, src_size[s]+0, dst_size[s]+0, duration, payloads[s], status
             }
-        }' ./Results/"$data" > ./Results/.sample.data
+        }' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function udp_data_analysis() {
@@ -522,7 +551,7 @@ function parse_udp_data() {
     if [ -s "./Results/tr_icmp_udp.data" ]; then
         tr ',' ' ' < ./Results/tr_icmp_udp.data | \
         awk '{print $1 " " $3 " " $5 " " $6 " " $7 " " $8 " " $9}' \
-        2>/dev/null > ./Results/tr_icmp_udp1.data
+        2> /dev/null > ./Results/tr_icmp_udp1.data
     else
         echo "0 0.0.0.0 0.0.0.0 1 1 3 3" > ./Results/tr_icmp_udp1.data; fi
 
@@ -550,7 +579,7 @@ function parse_udp_data() {
             else
                 print $0, "NA NA"
         }
-    ' ./Results/tr_icmp_udp1.data ./Results/$data > ./Results/.sample.data
+    ' ./Results/tr_icmp_udp1.data ./Results/$data > ./Results/sample.data
 
     awk '
         function icmp_flag_name(type, code) 
@@ -687,7 +716,7 @@ function parse_udp_data() {
                 src_size[k]+0, dst_size[k]+0, icmp_type_out, icmp_code_out, duration, payloads[k], status
             }
         }
-    ' ./Results/.sample.data > ./Results/.sample1.data
+    ' ./Results/sample.data > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function generate_results_tcp() {
@@ -708,7 +737,7 @@ function generate_results_tcp() {
                 -v ip_src="$src_ip" \
                 -v pattern="^($filter_dst)$" \
                 '$NF == status && $3 == ip_src && $4 ~ pattern {print $1}' \
-                ./Results/.sample.data
+                ./Results/$filename.tmp
         ))
     else
         sessions=($(
@@ -716,7 +745,7 @@ function generate_results_tcp() {
                 -v ip_src="$src_ip" \
                 -v ip_dst="$1" \
                 '$NF == status && $3 == ip_src && $4 == ip_dst {print $1}' \
-                ./Results/.sample.data
+                ./Results/$filename.tmp
         )); fi
 
     filter_pcap=""
@@ -724,30 +753,30 @@ function generate_results_tcp() {
     for ((p = 0; p <= ${#sessions[@]} - 1; p++)); do
         stream="${sessions[$p]}"
         if (( p == ${#sessions[@]} - 1 )); then
-            if [ "$data" == "tcp.data" ]; then
+            if [[ "$filename" == tcp_* ]]; then
                 filter_pcap+="tcp.stream eq $stream"
             else
                 filter_pcap+="udp.stream eq $stream"; fi
 
             filter_json+="$stream"
         else
-            if [ "$data" == "tcp.data" ]; then
+            if [[ "$filename" == tcp_* ]]; then
                 filter_pcap+="tcp.stream eq $stream or "
             else
                 filter_pcap+="udp.stream eq $stream or "; fi
 
             filter_json+="$stream|"; fi; done
 
-    output_pcap="ALERT_INFO_${id_result}_.pcap"
+    output_pcap="ALERT_INFO_${id_result}.pcap"
     output_json="ALERT_INFO_${type}_${id_result}_.json"
-    awk -v pattern="^($filter_json)$" '$1 ~ pattern' ./Results/.sample.data \
-    > ./Results/.result_logs.data
+    awk -v pattern="^($filter_json)$" '$1 ~ pattern' ./Results/$filename \
+    > ./Results/result_logs.data
     generate_json_logs
 
-    tshark -r ./Pcaps/Trims/$pcap_file -Y "${filter_pcap}" \
+    tshark -r "./Pcaps/Trims/${flow_data}.pcap" -Y "${filter_pcap}" \
     -w "./Results/${output_pcap}" 2> /dev/null
 
-    echo -e "\n\t [!] [$alert] ==> [$output_pcap] [$output_json]" | \
+    echo -e "\n\t ${red}[!]${default} [$alert] ==> [$output_pcap] [$output_json]" | \
     tee -a .logs.log
     id_result=$((id_result + 1))
 }
@@ -761,39 +790,66 @@ function generate_json_logs() {
         udp_json_logs "$output_json"; fi
 }
 
-function analyze_pcap_data() {
+function parse_pcap_data() {
 
-    mapfile -t data_file < <(ls -1 ./Results/ 2> /dev/null)
-
-    tcp=0; udp=0; http=0; dns=0; smb2=0
-    rpc=0; dcerpc=0; ntlm=0; kerberos=0
-    ftp=0; ssh=0
+    type=""
+    mapfile -t data_file < <(ls -1 ./Results/*.data 2> /dev/null)
 
     for ((k = 0; k <= ${#data_file[@]} - 1; ++k)); do
-        data="${data_file[$k]}"
+        data=$(basename "${data_file[$k]}")
         if [ -s "./Results/$data" ]; then
             if [ "$data" == "tcp.data" ]; then
                 type="tcp"
                 parse_tcp_data
-                import_tcp_data "$flow_id" "$file_db"
-                tcp_data_analysis
             elif [ "$data" == "udp.data" ]; then
                 type="udp"
                 parse_udp_data
-                import_udp_data "$flow_id" "$file_db"
-                udp_data_analysis; fi; fi; done
+            elif [ "$data" == "dns.data" ]; then
+                type="dns"
+                #parse_dns_data
+            elif [ "$data" == "http.data" ]; then
+                type="http"
+                #parse_http_data
+            elif [ "$data" == "ssh.data" ]; then
+                type="ssh"
+                #parse_ssh_data
+            elif [ "$data" == "smb2.data" ]; then
+                type="smb2"
+                #parse_smb2_data
+            elif [ "$data" == "kerberos.data" ]; then
+                type="kerberos"
+                #parse_kerberos_data
+            elif [ "$data" == "ftp.data" ]; then
+                type="ftp"
+                #parse_ftp_data
+            elif [ "$data" == "rpc.data" ]; then
+                type="rpc"
+                #parse_rpc_data
+            elif [ "$data" == "dcerpc.data" ]; then
+                type="dcerpc"
+                #parse_dcerpc_data
+            elif [ "$data" == "ntlm.data" ]; then
+                type="ntlm"
+                #parse_ntlm_data 
+            fi
+                import_data "$flow_id" "$file_db" "$type" "$id_pcap_file"; fi; done
 }
 
 function analyzer() {
 
     mapfile -t t_pcaps < <(ls -1 ./Pcaps/Trims/ | grep "^[0-9]" 2> /dev/null)
     echo -e "\n [+] Sessions joined in [${t_pcaps[*]}]" >> .logs.log
-    echo -e "\n [+] Flows to analyze ==> ${#t_pcaps[@]}" | tee -a .logs.log
+    echo -e "\n [+] Flows to analyze ==> ${#t_pcaps[@]} \n" | tee -a .logs.log
 
     id_result=1
-    flow_id=""
+    flow_id=0
     id_db=0
     file_db="Database_${id_db}.db"
+    id_pcap_files=()
+
+    tcp=0; udp=0; http=0; dns=0; smb2=0
+    rpc=0; dcerpc=0; ntlm=0; kerberos=0
+    ftp=0; ssh=0
 
     while [ -e "$file_db" ]; do
         id_db=$((id_db + 1))
@@ -801,14 +857,33 @@ function analyzer() {
 
     for ((i = 0; i <= ${#t_pcaps[@]} - 1; i++)); do
         pcap_file="${t_pcaps[$i]}"
+        id_pcap_file=$(echo "$pcap_file" | sed 's/\.pcap$//')
+        id_pcap_files+=("$id_pcap_file")
         flow_id=$i
-        echo -e "\n [+] Analyzing flow ${flow_id} [${pcap_file}]" | \
+        echo -e "\n [+] Extracting and parsing data - flow ${flow_id} [${pcap_file}]" | \
         tee -a .logs.log
         for ((j = 0; j <= ${#protos[@]} - 1; j++)); do
             proto="${protos[$j]}"
             extract_pcap_data; done
-            analyze_pcap_data
+            parse_pcap_data
             rm ./Results/*.data; done
+
+    hunt_msg="Hunting evil, this may take a few minutes."
+    echo -e -n "\n\n ${red}[+] "
+
+    for ((i = 0; i <= ${#hunt_msg} - 1; i++)); do
+        echo -n "${hunt_msg:$i:1}" && sleep 0.02; done 
+
+    echo -e "${default}\n"
+
+    for ((i = 0; i <= ${#id_pcap_files[@]}; i++)); do 
+        flow_data="${id_pcap_files[$i]}"
+        for flow in ./Results/*_"$flow_data".parsed; do
+            filename=$(basename $flow) 
+            if [[ "$filename" == tcp_* ]]; then
+                tcp_data_analysis
+            elif [[ "$filename" == udp_* ]]; then
+                udp_data_analysis; fi; done; done
 }
 
 function main() {
@@ -818,12 +893,15 @@ function main() {
     echo -e "\n [*] Stored pcaps: \n"
 
     echo -e "\n$(
-        for ((i = 0; i <= 100; ++i)); do echo -n "/"; done
+        for ((i = 0; i <= 100; ++i)); do 
+            echo -n "/"; done
         echo -e "\n\n $(date) \n"
-        for ((i = 0; i <= 100; ++i)); do echo -n "/"; done
+        for ((i = 0; i <= 100; ++i)); do 
+            echo -n "/"; done
     )\n" >> .logs.log
 
     mapfile -t pcaps < <(ls -1 ./Pcaps/*.pcap 2> /dev/null)
+    input_msg="Please, enter a pcap file to be analyzed: "
 
     if [ "${#pcaps[@]}" -ne 0 ]; then
         exists=0
@@ -836,8 +914,10 @@ function main() {
                 echo -n " [$i] $(basename $pcap_file)"; fi; done
 
         while [ "$exists" -eq 0 ]; do
-            echo -e " \n\n Please, enter a pcap file to be analyzed: "
-            read pcap
+            echo -e " \n\n " 
+            for ((i = 0; i <= ${#input_msg} - 1; i++)); do
+                echo -n "${input_msg:$i:1}" && sleep 0.02; done 
+                read pcap
 
             if [[ -f "./Pcaps/$pcap" ]]; then
                 exists=1
@@ -846,7 +926,7 @@ function main() {
                 input_pcap_error; fi; done
 
         if [ "$exists" -eq 1 ]; then
-            echo -e "\n\n [+] Analyzing pcap, this may take a while."
+            echo -e "\n\n [+] Trimming pcap ...."
             if PcapSplitter -f ./Pcaps/$pcap -o ./Pcaps/Trims/ -m connection \
                 /dev/null 2>&1 | grep 'ERROR'; then
                 pcapplusplus_error
@@ -878,7 +958,7 @@ function main() {
 
         analyzer
     else
-        echo -e " [!] No stored pcaps found.\n" | tee -a .logs.log
+        echo -e "${red} [!] No stored pcaps found.\n${default}" | tee -a .logs.log
         exit 2; fi
 }
 
@@ -958,3 +1038,4 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
+
