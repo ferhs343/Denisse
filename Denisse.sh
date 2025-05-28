@@ -92,35 +92,20 @@ function extract_pcap_data() {
             -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
             -e "tcp.dstport" -e "http.request.method" \
-            -e "http.request.full_uri" -e "http.content_type" \
-            -e "http.content_length" -e "http.user_agent" \
-            -e "http.response.code" -e "http.file_data" 2> /dev/null | \
-            awk -F'\t' '
+            -e "http.request.full_uri" -e "http.user_agent" \
+            -e "http.content_type" -e "http.content_length" \
+            -e "http.response.code" -e "http.file_data" \
+            -e "mime_multipart.header.content-type" \
+            -e "mime_multipart.header.content-disposition" 2> /dev/null | \
+            tr ',' ';' | tr -d ' ' | awk -F'\t' '
                 {
                     for (i = 1; i <= NF; i++)
                     {
-                        if (i == "") $i = "Null"
+                        if ($i == "") $i = "Null"
                     }
 
                     OFS="\t"; print
-                }' > ./Results/$proto.data
-                
-        tshark -r ./Pcaps/Trims/$pcap_file -Y "http2" -T fields \
-            -e "tcp.stream" -e "frame.time_epoch" -e "ip.src" \
-            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
-            -e "tcp.dstport" -e "http2.headers.method" \
-            -e "http2.headers.path" -e "http2.headers.content_type" \
-            -e "http2.headers.content_length" -e "http2.headers.user_agent" \
-            -e "http2.headers.status" -e "http2.data.data" 2> /dev/null | \
-            awk -F'\t' '
-                {
-                    for (i = 1; i <= NF; i++)
-                    {
-                        if (i == "") $i = "Null"
-                    }
-
-                    OFS="\t"; print
-                }' > "./Results/${proto}2.data"; fi
+                }' > ./Results/$proto.data;  fi
 
     if [ "$proto" == "dns" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "dns" -T fields \
@@ -458,11 +443,6 @@ function parse_tcp_data() {
             
             timestamp_end[session] = $2
 
-            if (!(session in seen)) 
-            {
-                seen[session] = $0
-            }
-
             flag_key = session "|" $5
 
             if (!(flag_key in flag_seen)) 
@@ -719,6 +699,30 @@ function parse_udp_data() {
     ' ./Results/sample.data > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
+function parse_http_data() {
+
+    awk '
+    {
+        if ($5 != "Null" && $6 != "Null")
+        {
+            src = $5; dst = $6
+        } 
+        else if ($3 != "Null" && $4 != "Null")
+        {
+            src = $3; dst = $4
+        }
+
+        request = $1 FS src FS dst FS $7 FS $8 FS $9
+        response = $1 FS src FS dst FS $7 FS $8 FS $14
+
+        if (!(request in seen))
+        {
+            seen[request] = $0 
+        }
+    }
+    ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+}
+
 function generate_results_tcp() {
 
     if [ "$horizontal_scan" -eq 1 ]; then
@@ -809,7 +813,7 @@ function parse_pcap_data() {
                 #parse_dns_data
             elif [ "$data" == "http.data" ]; then
                 type="http"
-                #parse_http_data
+                parse_http_data
             elif [ "$data" == "ssh.data" ]; then
                 type="ssh"
                 #parse_ssh_data
@@ -1038,4 +1042,5 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
+
 
