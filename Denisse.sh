@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Denisse v.1.0.0
+# The Denisse's Project v.1.0.0
 # By: Luis Fernando Herrera - luis.herrera@scitum.com.mx
 
 source Errors.sh
@@ -10,6 +10,7 @@ source DB_Tables.sh
 
 red="\e[0;31m\033[1m"
 default="\033[0m\e[0m"
+yellow="\e[0;33m\033[1m"
 
 dependencies=(
     "tshark"
@@ -30,16 +31,19 @@ arg2=$2
 
 function show_help() {
 
-    echo -e "\n Denisse v.1.0.0"
-    echo -e "\n Usage: ./Tool.sh [OPTION] \n"
+    echo -e "\n The Denisse's Project v.1.0.0"
+    echo -e "\n Usage: ./Denisse.sh [OPTION] \n"
     echo -e "\n [OPTIONS]"
-    echo -e "\n     --help        |  -h : Show this panel."
-    echo -e "\n     --all         |  -a : Analyze all supported protocols."
-    echo -e "\n     --protocols   |  -p : Analyze certain protocols, specify with commas."
-    echo -e "\n\n Supported protocols: [tcp,udp,http,dns,smb2,rpc,dcerpc,ntlm,kerberos,ftp,ssh]"
+    echo -e "\n     --help              |  -h : Show this panel."
+    echo -e "\n     --all               |  -a : Analyze all supported protocols."
+    echo -e "\n     --protocols         |  -p : Analyze certain protocols, specify with commas."
+    echo -e "\n     --found-protocols   |  -f : If you are not sure which supported protocols are in your pcap file, use this function."
+    echo -e "\n\n Supported protocols:"
+    echo -e "\n [tcp,udp,http,dns,smb2,rpc,dcerpc,ntlm,kerberos,ftp,ssh,llmnr,tftp,dhcp,dhcpv6]"
     echo -e "\n\n Ussage examples:"
-    echo -e "\n ./Tool.sh -a"
-    echo -e "\n ./Tool.sh -p tcp,smb2,dns,kerberos,...... \n"
+    echo -e "\n ./Denisse.sh -a"
+    echo -e "\n ./Denisse.sh -p tcp,smb2,dns,kerberos,......"
+    echo -e "\n ./Denisse.sh -l ./Pcaps/file.pcap \n"
 }
 
 function banner() {
@@ -55,11 +59,11 @@ function banner() {
     echo "                  \       \|           / / "
     echo " +-----------------(((--(((------------\ \--------------------------------+"
     echo " |                                                                        |"
-    echo " |   Denisse V.1.0.0                                                      |"
+    echo " |   The Denisse's Project V.1.0.0                                        |"
     echo " |   By Luis F. Herrera - luis.herrera@scitum.com.mx                      |"
     echo " |                                                                        |"
-    echo " |   Welcome to Denisse, your traffic analyst hunting for anomalies       |"
-    echo " |   where others don't look.                                             |"
+    echo " |   Welcome to 'The Denisse's Project', your traffic analyst hunting     |"
+    echo " |   for anomalies where others don't look.                               |"
     echo " |                                                                        |"
     echo " |   Happy Hunting!! :D                                                   |"
     echo " |                                                                        |"
@@ -97,7 +101,7 @@ function extract_pcap_data() {
             -e "http.response.code" -e "http.file_data" \
             -e "mime_multipart.header.content-type" \
             -e "mime_multipart.header.content-disposition" 2> /dev/null | \
-            tr ',' ';' | tr -d ' ' | awk -F'\t' '
+            tr ',' ';' | tr ' ' ':'| awk -F'\t' '
                 {
                     for (i = 1; i <= NF; i++)
                     {
@@ -110,11 +114,22 @@ function extract_pcap_data() {
     if [ "$proto" == "dns" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "dns" -T fields \
             -e "udp.stream" -e "frame.time_epoch" -e "ip.src" \
-            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" \
-            -e "udp.srcport" -e "udp.dstport" -e "dns.qry.name" \
-            -e "dns.flags" -e "dns.qry.name.len" \
-            -e "dns.resp.type" -e "dns.resp.name" -e "dns.a" \
-            -e "dns.aaaa" -e "dns.txt" 2> /dev/null > ./Results/$proto.data; fi
+            -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "udp.srcport" \
+            -e "udp.dstport" -e "dns.flags.response" -e "dns.qry.name" \
+            -e "dns.qry.name.len" -e "dns.qry.type" -e "dns.flags.rcode" \
+            -e "dns.flags.authoritative" -e "dns.flags.recdesired" \
+            -e "dns.flags.recavail" -e "dns.resp.type" -e "dns.resp.name" \
+            -e "dns.a" -e "dns.aaaa" -e "dns.mx.mail_exchange" -e "dns.ns" \
+            -e "dns.cname" -e "dns.txt" 2> /dev/null | \
+            tr ',' ';' | awk -F'\t' '
+                {
+                    for (i = 1; i <= NF; i++)
+                    {
+                        if ($i == "") $i = "Null"
+                    }
+
+                    OFS="\t"; print
+                }' > ./Results/$proto.data; fi
 
     if [ "$proto" == "smb2" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "smb2" -T fields -e \
@@ -318,9 +333,10 @@ function tcp_data_analysis() {
     src_type=""
     vertical_scan=0
     horizontal_scan=0
-
-    for ((it = 0; it < 2; ++it)); do
-        if [ "$it" -eq 0 ]; then
+    it=0
+    
+    while (( it++ < 2 )); do
+        if (( it == 1 )); then
             LocToLoc_regex
             src_type="Internal"
         else
@@ -346,7 +362,7 @@ function parse_tcp_data() {
             else if (f ~ /00$/) return "Null"
             else if (f ~ /08$/) return "Push"
             else if (f ~ /18$/) return "PushAck"
-            else if (f ~ /29$/) return "Xmas"
+            else if (f ~ /29$/) return "Fin;Push;Urg"
             return "NPI"
         }
 
@@ -367,7 +383,7 @@ function parse_tcp_data() {
                 else if (arr[i] == "Null") has_null = 1
                 else if (arr[i] == "Push") has_push = 1
                 else if (arr[i] == "PushAck") has_pushack = 1
-                else if (arr[i] == "Xmas") has_xmas = 1
+                else if (arr[i] == "Fin;Push;Urg") has_xmas = 1
             }
 
             if ((has_syn && has_rstack) &&
@@ -515,9 +531,9 @@ function parse_tcp_data() {
 function udp_data_analysis() {
 
     #echo "udp" && sleep 5
-
-    for ((it = 0; it < 2; ++it)); do
-        if [ "$it" -eq 0 ]; then
+    it=0
+    while (( it++ < 2 )); do
+        if (( it == 1 )); then
             LocToLoc_regex
             src_type="Internal"
         else
@@ -702,25 +718,123 @@ function parse_udp_data() {
 function parse_http_data() {
 
     awk '
-    {
-        if ($5 != "Null" && $6 != "Null")
         {
-            src = $5; dst = $6
-        } 
-        else if ($3 != "Null" && $4 != "Null")
-        {
-            src = $3; dst = $4
+            if ($5 != "Null" && $6 != "Null") 
+            {
+                src = $5; dst = $6
+            } 
+            else if ($3 != "Null" && $4 != "Null") 
+            {
+                src = $3; dst = $4
+            } 
+            else 
+            {
+                next
+            }
+
+            key = $1 ":" src ":" dst ":" $7 ":" $8
+            rev_key = $1 ":" dst ":" src ":" $8 ":" $7
+
+            if ($9 != "Null") 
+            {
+                req_id[key] = $1
+                req_time[key] = $2
+                req_src[key] = src
+                req_dst[key] = dst
+                req_sport[key] = $7
+                req_dport[key] = $8
+                req_method[key] = $9
+                req_uri[key] = $10
+                req_ua[key] = $11
+                req_type[key] = $12
+                req_len[key] = $13
+                req_data[key] = $15
+                req_seen[key] = 1
+            }   
+            else if ($14 ~ /^[1-5][0-9][0-9]$/) 
+            {
+                if (req_seen[rev_key]) 
+                {
+                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], req_dst[rev_key], 
+                    req_sport[rev_key], req_dport[rev_key], req_method[rev_key], req_uri[rev_key],
+                    req_ua[rev_key], req_type[rev_key], req_len[rev_key], req_data[rev_key],
+                    $14, $12, $13, $15, $16, $17
+
+                    matched[rev_key] = 1
+                }
+                else
+                {
+                    req_id[rev_key] = $1
+                    req_time[rev_key] = $2
+                    req_src[rev_key] = dst
+                    req_dst[rev_key] = src
+                    req_sport[rev_key] = $7
+                    req_dport[rev_key] = $8
+
+                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], req_dst[rev_key], 
+                    req_sport[rev_key], req_dport[rev_key], "Null", "Null", "Null", "Null", "Null", 
+                    "Null", $14, $12, $13, $15, $16, $17
+
+                    matched[rev_key] = 1
+                }
+            }
         }
 
-        request = $1 FS src FS dst FS $7 FS $8 FS $9
-        response = $1 FS src FS dst FS $7 FS $8 FS $14
+        END {
+            for (k in req_seen) 
+            {
+                if (!(matched[k])) 
+                {
+                    print req_id[k], req_time[k], req_src[k], req_sport[k],
+                    req_dst[k], req_dport[k], req_method[k], req_uri[k],
+                    req_ua[k], req_type[k], req_len[k], req_data[k],
+                    "Null", "Null", "Null", "Null", "Null", "Null"
+                }
+            }
+        }' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+}
 
-        if (!(request in seen))
-        {
-            seen[request] = $0 
+function parse_dns_data() {
+
+    awk '
+        BEGIN {
+            id_gen = 0
         }
-    }
-    ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+
+        {
+            if ($3 != "Null" && $4 != "Null")
+            {
+                src = $3; dst = $4
+            }
+            else if ($5 != "Null" && $6 != "Null")
+            {
+                src = $5; dst = $6
+            }
+            else 
+            {
+                next
+            }
+
+            key_tmp = src ":" dst ":" $7 ":" $8 ":" $10 ":" id_gen
+            rev_key_tmp = dst ":" src ":" $8 ":" $7 ":" $10 ":" id_gen
+
+            if ($9 == "False")
+            {
+                while (key_tmp in req_seen)
+                {
+                    id_gen ++
+                    key_tmp = src ":" dst ":" $7 ":" $8 ":" $11 ":" id_gen
+                    rev_key_tmp = dst ":" src ":" $8 ":" $7 ":" $11 ":" id_gen
+                }
+
+                req_seen[key_tmp] = 1
+            }
+            else if ($9 == "True")
+            {
+                next
+            }
+        }
+        ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function generate_results_tcp() {
@@ -810,7 +924,7 @@ function parse_pcap_data() {
                 parse_udp_data
             elif [ "$data" == "dns.data" ]; then
                 type="dns"
-                #parse_dns_data
+                parse_dns_data
             elif [ "$data" == "http.data" ]; then
                 type="http"
                 parse_http_data
@@ -853,18 +967,25 @@ function analyzer() {
 
     tcp=0; udp=0; http=0; dns=0; smb2=0
     rpc=0; dcerpc=0; ntlm=0; kerberos=0
-    ftp=0; ssh=0
+    ftp=0; ssh=0; llmnr=0
 
     while [ -e "$file_db" ]; do
         id_db=$((id_db + 1))
         file_db="Database_${id_db}.db"; done
+
+    data_msg="Gutting pcap, this may take a few minutes."
+    echo -e -n "\n ${yellow}[+] "
+
+    for ((i = 0; i <= ${#data_msg} - 1; i++)); do
+        echo -n "${data_msg:$i:1}" && sleep 0.02; done 
+        echo -e "${default}\n"
 
     for ((i = 0; i <= ${#t_pcaps[@]} - 1; i++)); do
         pcap_file="${t_pcaps[$i]}"
         id_pcap_file=$(echo "$pcap_file" | sed 's/\.pcap$//')
         id_pcap_files+=("$id_pcap_file")
         flow_id=$i
-        echo -e "\n [+] Extracting and parsing data - flow ${flow_id} [${pcap_file}]" | \
+        echo -e "\n ${yellow}[+]${default} Extracting and parsing data - flow ${flow_id} [${pcap_file}]" | \
         tee -a .logs.log
         for ((j = 0; j <= ${#protos[@]} - 1; j++)); do
             proto="${protos[$j]}"
@@ -872,13 +993,12 @@ function analyzer() {
             parse_pcap_data
             rm ./Results/*.data; done
 
-    hunt_msg="Hunting evil, this may take a few minutes."
+    hunt_msg="Hunting hidden enemy...."
     echo -e -n "\n\n ${red}[+] "
 
     for ((i = 0; i <= ${#hunt_msg} - 1; i++)); do
         echo -n "${hunt_msg:$i:1}" && sleep 0.02; done 
-
-    echo -e "${default}\n"
+        echo -e "${default}\n"
 
     for ((i = 0; i <= ${#id_pcap_files[@]}; i++)); do 
         flow_data="${id_pcap_files[$i]}"
@@ -899,13 +1019,13 @@ function main() {
     echo -e "\n$(
         for ((i = 0; i <= 100; ++i)); do 
             echo -n "/"; done
-        echo -e "\n\n $(date) \n"
+            echo -e "\n\n $(date) \n"
         for ((i = 0; i <= 100; ++i)); do 
             echo -n "/"; done
     )\n" >> .logs.log
 
     mapfile -t pcaps < <(ls -1 ./Pcaps/*.pcap 2> /dev/null)
-    input_msg="Please, enter a pcap file to be analyzed: "
+    input_msg=" Please, enter a pcap file to be analyzed: "
 
     if [ "${#pcaps[@]}" -ne 0 ]; then
         exists=0
@@ -962,7 +1082,8 @@ function main() {
 
         analyzer
     else
-        echo -e "${red} [!] No stored pcaps found.\n${default}" | tee -a .logs.log
+        echo -e "${red} [!] No stored pcaps found.\n${default}" | \
+        tee -a .logs.log
         exit 2; fi
 }
 
@@ -982,6 +1103,10 @@ function starting() {
         "kerberos"
         "ftp"
         "ssh"
+        "llmnr"
+        "tftp"
+        "dhcp"
+        "dhcpv6"
     )
 
     if [ "$arg1" == "--help" ] ||
@@ -1016,11 +1141,31 @@ function starting() {
                       "$proto_arg" == "ntlm" ||
                       "$proto_arg" == "kerberos" ||
                       "$proto_arg" == "ftp" ||
-                      "$proto_arg" == "ssh" 
+                      "$proto_arg" == "ssh" ||
+                      "$proto_arg" == "llmnr" ||
+                      "$proto_arg" == "tftp" ||
+                      "$proto_arg" == "dhcp" ||
+                      "$proto_arg" == "dhcv6"
                    ]]; then
                     error=$((error + 1)); fi; done; fi
+
+    elif [ "$arg1" == "--found-protocols" ] ||
+         [ "$arg1" == "-f" ]; then
+        
+        if [[ -f "$arg2" ]]; then
+            echo -e "\n [*] Searching for compatible protocols in the pcap file...\n" && sleep 2
+            mapfile -t found_p < <(tshark -r $arg2 -T fields -e "frame.protocols" 2> /dev/null | \
+            tr ':' '\n' | sort -u | grep -wE 'tcp|udp|http|dns|smb2|rpc|dcerpc|ntlm|kerberos|ftp|ssh|llmnr|tftp|dhcp|dhcpv6')
+            if [ "${#found_p[@]}" -gt 0 ]; then
+                for ((i = 0; i <= ${#found_p[@]} - 1; i++)); do
+                    echo -e "${yellow} [+] ${found_p[$i]} \n ${default}"
+                    done && exit 
+            else
+                echo -e "${red} [x] No protocols found.${default}" && exit; fi
+        else
+            input_pcap_error && exit 1; fi
     else
-        show_help; fi
+        show_help && exit 1; fi
 
     if [[ "$no_error" -eq 1 ||
           "$error" -eq "${#protos[@]}" ]]; then
@@ -1034,7 +1179,8 @@ if [ "$(id -u)" == "0" ]; then
     check_dependencies
     if [ "${#to_install[@]}" -gt 0 ]; then
         echo -e "\n [*] Checking necessary dependencies.... \n" 
-        sleep 3 && install_dependencies
+        sleep 1.5 && echo -e " [${to_install[*]}]" && sleep 3 
+        install_dependencies
         if [ "$control" -eq "${#to_install[@]}" ]; then
             starting; fi
     else
@@ -1042,5 +1188,6 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
+
 
 
