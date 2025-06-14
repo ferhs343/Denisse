@@ -115,12 +115,15 @@ function extract_pcap_data() {
         tshark -r ./Pcaps/Trims/$pcap_file -Y "dns" -T fields \
             -e "udp.stream" -e "frame.time_epoch" -e "ip.src" \
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "udp.srcport" \
-            -e "udp.dstport" -e "dns.flags.response" -e "dns.qry.name" \
-            -e "dns.qry.name.len" -e "dns.qry.type" -e "dns.flags.rcode" \
-            -e "dns.flags.authoritative" -e "dns.flags.recdesired" \
-            -e "dns.flags.recavail" -e "dns.resp.type" -e "dns.resp.name" \
-            -e "dns.a" -e "dns.aaaa" -e "dns.mx.mail_exchange" -e "dns.ns" \
-            -e "dns.cname" -e "dns.txt" 2> /dev/null | \
+            -e "udp.dstport" -e "dns.flags.response" -e "dns.id" \
+            -e "dns.qry.name" -e "dns.qry.name.len" -e "dns.qry.type" \
+            -e "dns.flags.rcode" -e "dns.flags.authoritative" \
+            -e "dns.flags.recdesired" -e "dns.flags.recavail" \
+            -e "dns.resp.type" -e "dns.resp.name" -e "dns.a" \
+            -e "dns.aaaa" -e "dns.mx.mail_exchange" -e "dns.ns" \
+            -e "dns.cname" -e "dns.txt" -e "dns.resp.ttl" -e "frame.number" \
+            -e "dns.response_to" -e "dns.retransmission" \
+            -e "dns.retransmit_response_in" 2> /dev/null | \
             tr ',' ';' | awk -F'\t' '
                 {
                     for (i = 1; i <= NF; i++)
@@ -522,8 +525,9 @@ function parse_tcp_data() {
                 gsub(/ +/, ";", flags_list[s])
 
                 print fields[1], fields[2], fields[3], fields[4], fields[7], 
-                fields[8], flags_list[s], total_pkts[s]+0, src_pkts[s]+0, dst_pkts[s]+0, 
-                total_size[s]+0, src_size[s]+0, dst_size[s]+0, duration, payloads[s], status
+                fields[8], flags_list[s], total_pkts[s]+0, src_pkts[s]+0, 
+                dst_pkts[s]+0, total_size[s]+0, src_size[s]+0, dst_size[s]+0, 
+                duration, payloads[s], status
             }
         }' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
@@ -707,9 +711,10 @@ function parse_udp_data() {
                     payloads[k] = "[Null]"
                 }
 
-                print session_id[k], timestamp[k], src_ip[k], dst_ip[k], src_port[k], 
-                dst_port[k], total_pkts[k]+0, src_pkts[k]+0, dst_pkts[k]+0, total_size[k]+0, 
-                src_size[k]+0, dst_size[k]+0, icmp_type_out, icmp_code_out, duration, payloads[k], status
+                print session_id[k], timestamp[k], src_ip[k], dst_ip[k], 
+                src_port[k], dst_port[k], total_pkts[k]+0, src_pkts[k]+0, 
+                dst_pkts[k]+0, total_size[k]+0, src_size[k]+0, dst_size[k]+0, 
+                icmp_type_out, icmp_code_out, duration, payloads[k], status
             }
         }
     ' ./Results/sample.data > "./Results/${type}_${id_pcap_file}.parsed"
@@ -755,9 +760,10 @@ function parse_http_data() {
             {
                 if (req_seen[rev_key]) 
                 {
-                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], req_dst[rev_key], 
-                    req_sport[rev_key], req_dport[rev_key], req_method[rev_key], req_uri[rev_key],
-                    req_ua[rev_key], req_type[rev_key], req_len[rev_key], req_data[rev_key],
+                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], 
+                    req_dst[rev_key], req_sport[rev_key], req_dport[rev_key], 
+                    req_method[rev_key], req_uri[rev_key], req_ua[rev_key], 
+                    req_type[rev_key], req_len[rev_key], req_data[rev_key],
                     $14, $12, $13, $15, $16, $17
 
                     matched[rev_key] = 1
@@ -771,9 +777,10 @@ function parse_http_data() {
                     req_sport[rev_key] = $7
                     req_dport[rev_key] = $8
 
-                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], req_dst[rev_key], 
-                    req_sport[rev_key], req_dport[rev_key], "Null", "Null", "Null", "Null", "Null", 
-                    "Null", $14, $12, $13, $15, $16, $17
+                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], 
+                    req_dst[rev_key], req_sport[rev_key], req_dport[rev_key], 
+                    "Null", "Null", "Null", "Null", "Null", "Null", $14, $12, 
+                    $13, $15, $16, $17
 
                     matched[rev_key] = 1
                 }
@@ -797,44 +804,87 @@ function parse_http_data() {
 function parse_dns_data() {
 
     awk '
-        BEGIN {
-            id_gen = 0
-        }
 
+    BEGIN {
+        id_gen_req = 0
+    }
+
+    function request_type(rtype)
+    {
+        if (rtype == 1) return "A"
+        else if (rtype == 28) return "AAAA"
+        else if (rtype == 12) return "PTR"
+        else if (rtype == 5) return "CNAME"
+        else if (rtype == 15) return "MX"
+        else if (rtype == 2) return "NS"
+        else if (rtype == 6) return "SOA"
+        else if (rtype == 16) return "TXT"
+        else if (rtype == 33) return "SRV"
+        else if (rtype == 255) return "ANY"
+        else if (rtype == 35) return "NAPTR"
+        return "NPI"
+    }
+
+    function response_code(rcode)
+    {
+        if (rcode == 0) return "NOERROR"
+        else if (rcode == 1) return "FORMERR"
+        else if (rcode == 2) return "SERVFAIL"
+        else if (rcode == 3) return "NXDOMAIN"
+        else if (rcode == 4) return "NOTIMP"
+        else if (rcode == 5) return "REFUSED"
+        return "NPI"
+    }
+
+    {
+        if ($3 != "Null" && $4 != "Null")
         {
-            if ($3 != "Null" && $4 != "Null")
-            {
-                src = $3; dst = $4
-            }
-            else if ($5 != "Null" && $6 != "Null")
-            {
-                src = $5; dst = $6
-            }
-            else 
-            {
-                next
-            }
+            src = $3; dst = $4
+        }
+        else if ($5 != "Null" && $6 != "Null")
+        {
+            src = $5; dst = $6
+        }
+        else 
+        {
+            next
+        }
 
-            key_tmp = src ":" dst ":" $7 ":" $8 ":" $10 ":" id_gen
-            rev_key_tmp = dst ":" src ":" $8 ":" $7 ":" $10 ":" id_gen
+        if ($9 == "False")
+        {
+            aux = $(NF - 3)
+        }
+        else if ($9 == "True")
+        {
+            aux = ($(NF - 1) == "Null") ? $(NF - 2) : $NF
+        }
 
-            if ($9 == "False")
-            {
-                while (key_tmp in req_seen)
-                {
-                    id_gen ++
-                    key_tmp = src ":" dst ":" $7 ":" $8 ":" $11 ":" id_gen
-                    rev_key_tmp = dst ":" src ":" $8 ":" $7 ":" $11 ":" id_gen
-                }
+        key = src ":" dst ":" $7 ":" $8 ":" $10 ":" aux
+        rev_key = dst ":" src ":" $8 ":" $7 ":" $10 ":" aux
 
-                req_seen[key_tmp] = 1
-            }
-            else if ($9 == "True")
+        if ($9 == "False")
+        {
+            req_seen[key] = 1
+        }
+        else if ($9 == "True")
+        {
+            if (rev_key in req_seen)
             {
-                next
+                matched[rev_key] = 1
             }
         }
-        ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+    }
+
+    END {
+        for (k in req_seen)
+        {
+            if (!(matched[k]))
+            {
+                print k
+            }
+        }
+    }
+    ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function generate_results_tcp() {
