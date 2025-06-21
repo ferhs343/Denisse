@@ -678,7 +678,7 @@ function parse_udp_data() {
             if (NF > 9)
             {
                 payload = ""
-                for (i = 8; i < NF - 1; i++) 
+                for ( i = 8; i < NF - 1; i++ ) 
                 {
                     payload = (payload == "") ? $i : payload ";" $i
                 }
@@ -805,86 +805,146 @@ function parse_dns_data() {
 
     awk '
 
-    BEGIN {
-        id_gen_req = 0
-    }
-
-    function request_type(rtype)
-    {
-        if (rtype == 1) return "A"
-        else if (rtype == 28) return "AAAA"
-        else if (rtype == 12) return "PTR"
-        else if (rtype == 5) return "CNAME"
-        else if (rtype == 15) return "MX"
-        else if (rtype == 2) return "NS"
-        else if (rtype == 6) return "SOA"
-        else if (rtype == 16) return "TXT"
-        else if (rtype == 33) return "SRV"
-        else if (rtype == 255) return "ANY"
-        else if (rtype == 35) return "NAPTR"
-        return "NPI"
-    }
-
-    function response_code(rcode)
-    {
-        if (rcode == 0) return "NOERROR"
-        else if (rcode == 1) return "FORMERR"
-        else if (rcode == 2) return "SERVFAIL"
-        else if (rcode == 3) return "NXDOMAIN"
-        else if (rcode == 4) return "NOTIMP"
-        else if (rcode == 5) return "REFUSED"
-        return "NPI"
-    }
-
-    {
-        if ($3 != "Null" && $4 != "Null")
+        function request_type(req_type)
         {
-            src = $3; dst = $4
-        }
-        else if ($5 != "Null" && $6 != "Null")
-        {
-            src = $5; dst = $6
-        }
-        else 
-        {
-            next
+            if ( req_type == 1 ) { return "A" }
+            else if ( req_type == 2 ) { return "NS" }
+            else if ( req_type == 5 ) { return "CNAME" }
+            else if ( req_type == 6 ) { return "SOA" }
+            else if ( req_type == 12 ) { return "PTR" }
+            else if ( req_type == 15 ) { return "MX" }
+            else if ( req_type == 16 ) { return "TXT" }
+            else if ( req_type == 28 ) { return "AAAA" }
+            else if ( req_type == 33 ) { return "SRV" }
+            else if ( req_type == 35 ) { return "NAPTR" }
+            else if ( req_type == 255 ) { return "ANY" }
+            return "NPI"
         }
 
-        if ($9 == "False")
+        function response_type(resp_type)
         {
-            aux = $(NF - 3)
-        }
-        else if ($9 == "True")
-        {
-            aux = ($(NF - 1) == "Null") ? $(NF - 2) : $NF
+            if ( resp_type == 0 ) { return "NOERROR" }
+            else if ( resp_type == 1 ) { return "FORMERR" }
+            else if ( resp_type == 2 ) { return "SERVFAIL" }
+            else if ( resp_type == 3 ) { return "NXDOMAIN" }
+            else if ( resp_type == 4 ) { return "NOTIMP" }
+            else if ( resp_type == 5 ) { return "REFUSED" }
+            return "NPI"
         }
 
-        key = src ":" dst ":" $7 ":" $8 ":" $10 ":" aux
-        rev_key = dst ":" src ":" $8 ":" $7 ":" $10 ":" aux
-
-        if ($9 == "False")
+        function responses(data)
         {
-            req_seen[key] = 1
+    
         }
-        else if ($9 == "True")
+
         {
-            if (rev_key in req_seen)
+            if ( $3 != "Null" && $4 != "Null" )
             {
-                matched[rev_key] = 1
+                src = $3; dst = $4
+            }
+            else if ( $5 != "Null" && $6 != "Null" )
+            {
+                src = $5; dst = $6
+            }
+            else 
+            {
+                next
+            }
+
+            if ( $9 == "False" || $9 == 0 )
+            {
+                aux = $(NF - 3)
+            }
+            else if ( $9 == "True" || $9 == 1 )
+            {
+                aux = ( $( NF - 1 ) == "Null" ) ? $( NF - 2 ) : $NF
+            }
+
+            key = src ":" dst ":" $7 ":" $8 ":" $10 ":" aux
+            rev_key = dst ":" src ":" $8 ":" $7 ":" $10 ":" aux
+
+            if ( $9 == "False" || $9 == 0 )
+            {
+                req_seen[key] = 1
+                session[key] = $1
+                src_ip[key] = src
+                dst_ip[key] = dst
+                src_port[key] = $7
+                dst_port[key] = $8
+                trans_id[key] = $10
+                domain[key] = $11
+                domain_lenght[key] = $12
+                rtype_code[key] = $13
+                rtype_string[key] = request_type(rtype_code[key])
+            }
+            else if ( $9 == "True" || $9 == 1 )
+            {   
+                rev_key_resp = dst ":" src ":" $8 ":" $7 ":" $10 ":" (( $( NF - 1 ) ==  "Null" ) ? $( NF - 3 ) : $NF)
+                count[rev_key_resp] ++
+                retransmit[rev_key_resp,count[rev_key_resp]] = rev_key
+                resp_seen[rev_key] = 1
+
+                rptype_code[rev_key] = $14
+                rptype_string[rev_key] = response_type(rptype_code[rev_key])
+                is_authoritative[rev_key] = $15
+                is_recdesired[rev_key] = $16
+                is_recavail[rev_key] = $17
+                resp_names[rev_key] = $19
+                ttl[rev_key] = $26
+                answers[rev_key] = ""
+                separator = ""
+        
+                for ( i = 20; i <= 25; i++ )
+                {
+                    if ( $i != "Null" )
+                    {
+                        answers[rev_key] = answers[rev_key] separator $i
+                        separator = ";"
+                    }
+                }
             }
         }
-    }
 
-    END {
-        for (k in req_seen)
-        {
-            if (!(matched[k]))
+        END {
+
+            for ( key in count )
             {
-                print k
+                if ( count[key] > 1 )
+                {
+                    for ( i = 1; i <= count[key]; i++ )
+                    {
+                        pkt = retransmit[key,i]
+                
+                        if ( pkt in req_seen )
+                        {
+                            request = retransmit[key, i]
+                        }
+
+                        rptype_code[request] = rptype_code[request] "[" rptype_code[pkt] "]"
+                        answers[request] = answers[request] "[" answers[pkt] "]"
+                    }
+                }
             }
-        }
-    }
-    ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+
+            for ( k in req_seen )
+            {
+                if ( k in resp_seen )
+                {
+                    #print session[k], src_ip[k], dst_ip[k], src_port[k], dst_port[k],
+                    #trans_id[k], domain[k], domain_lenght[k], rtype_code[k], rtype_string[k],
+                    #rptype_code[k], rptype_string[k], is_authoritative[k], is_recdesired[k],
+                    #is_recavail[k], resp_names[k], ttl[k], answers[k]
+                }
+
+                if ( !( k in resp_seen ) )
+                {
+                    #print session[k], src_ip[k], dst_ip[k], src_port[k], dst_port[k],
+                    #trans_id[k], domain[k], domain_lenght[k], rtype_code[k], rtype_string[k],
+                    #rptype_code[k], rptype_string[k], is_authoritative[k], is_recdesired[k],
+                    #is_recavail[k], resp_names[k], ttl[k], answers[k]
+                }
+            }
+        }  ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function generate_results_tcp() {
@@ -1238,6 +1298,5 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
-
 
 
