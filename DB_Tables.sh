@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 function import_to_table() {
@@ -73,6 +72,57 @@ function import_udp_data() {
 EOF
 }
 
+function import_dns_data() {
+
+    sqlite3 ./Databases/"$db_file" 2>> .logs.log <<EOF
+    CREATE TABLE IF NOT EXISTS $table (
+        Session_Id INTEGER,
+        Timestamp REAL,
+        Src_Ip TEXT,
+        Dst_Ip TEXT,
+        Src_Port INTEGER,
+        Dst_Port INTEGER,
+        Dns_Query_Type_Code INTEGER,
+        Dns_Query_Type_Name TEXT,
+        Dns_Query_Domain TEXT,
+        Dns_Domain_Lenght INTEGER,
+        Dns_Response_Type_Code INTEGER,
+        Dns_Response_Type_Name TEXT,
+        Dns_Response INTEGER,
+        Dns_Response_Name TEXT,
+        Dns_Response_A TEXT,
+        Dns_Response_AAAA TEXT,
+        Dns_Response_TXT TEXT
+    );
+EOF
+}
+
+function import_http_data() {
+
+    sqlite3 ./Databases/"$db_file" 2>> .logs.log <<EOF
+    CREATE TABLE IF NOT EXISTS $table (
+        Session_Id INTEGER,
+        Timestamp REAL,
+        Src_Ip TEXT,
+        Dst_Ip TEXT,
+        Src_Port INTEGER,
+        Dst_Port INTEGER,
+        Method TEXT,
+        URI TEXT,
+        User_Agent TEXT,
+        Request_Content_Type TEXT,
+        Request_Content_Length INT,
+        Request_File_Data TEXT,
+        Response_Code INT,
+        Response_Content_Type TEXT,
+        Response_Content_Length INT,
+        Response_File_Data TEXT,
+        MIME_Content_Type TEXT,
+        MIME_Content_Disposition TEXT
+    );
+EOF
+}
+
 function import_data() {
 
     sample_data="./Results/${3}_${4}.parsed"
@@ -105,3 +155,5 @@ function import_data() {
 
     import_to_table
 }
+
+
