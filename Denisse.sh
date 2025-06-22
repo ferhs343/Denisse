@@ -917,11 +917,13 @@ function parse_dns_data() {
                 
                         if ( pkt in req_seen )
                         {
-                            request = retransmit[key, i]
+                            request = pkt
                         }
-
-                        rptype_code[request] = rptype_code[request] "[" rptype_code[pkt] "]"
-                        answers[request] = answers[request] "[" answers[pkt] "]"
+                        else
+                        {
+                            rptype_code[request] = "[" rptype_code[request] "][" rptype_code[pkt] "]"
+                            answers[request] = "[" answers[request] "][" answers[pkt] "]"
+                        }
                     }
                 }
             }
