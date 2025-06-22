@@ -919,7 +919,13 @@ function parse_dns_data() {
                         {
                             request = pkt
                         }
-                        else
+                    }
+
+                    for ( i = 1; i <= count[key]; i++ )
+                    {
+                        pkt = retransmit[key,i]
+
+                        if ( !( pkt in req_seen ) )
                         {
                             rptype_code[request] = "[" rptype_code[request] "][" rptype_code[pkt] "]"
                             answers[request] = "[" answers[request] "][" answers[pkt] "]"
