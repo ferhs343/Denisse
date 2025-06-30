@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# The Denisse's Project v.1.0.0
+# 'The Denisse's Project' v.1.0.0
 # By: Luis Fernando Herrera - luis.herrera@scitum.com.mx
 
 source Errors.sh
@@ -31,19 +31,17 @@ arg2=$2
 
 function show_help() {
 
-    echo -e "\n The Denisse's Project v.1.0.0"
+    echo -e "\n 'The Denisse's Project' v.1.0.0"
     echo -e "\n Usage: ./Denisse.sh [OPTION] \n"
     echo -e "\n [OPTIONS]"
     echo -e "\n     --help              |  -h : Show this panel."
-    echo -e "\n     --all               |  -a : Analyze all supported protocols."
+    echo -e "\n     --all               |  -a : If you are not sure what protocols are in your PCAP, use this option."
     echo -e "\n     --protocols         |  -p : Analyze certain protocols, specify with commas."
-    echo -e "\n     --found-protocols   |  -f : If you are not sure which supported protocols are in your pcap file, use this function."
     echo -e "\n\n Supported protocols:"
     echo -e "\n [tcp,udp,http,dns,smb2,rpc,dcerpc,ntlm,kerberos,ftp,ssh,llmnr,tftp,dhcp,dhcpv6]"
     echo -e "\n\n Ussage examples:"
     echo -e "\n ./Denisse.sh -a"
-    echo -e "\n ./Denisse.sh -p tcp,smb2,dns,kerberos,......"
-    echo -e "\n ./Denisse.sh -l ./Pcaps/file.pcap \n"
+    echo -e "\n ./Denisse.sh -p tcp,smb2,dns,kerberos,......\n"
 }
 
 function banner() {
@@ -59,7 +57,7 @@ function banner() {
     echo "                  \       \|           / / "
     echo " +-----------------(((--(((------------\ \--------------------------------+"
     echo " |                                                                        |"
-    echo " |   The Denisse's Project V.1.0.0                                        |"
+    echo " |  'The Denisse's Project' V.1.0.0                                       |"
     echo " |   By Luis F. Herrera - luis.herrera@scitum.com.mx                      |"
     echo " |                                                                        |"
     echo " |   Welcome to 'The Denisse's Project', your traffic analyst hunting     |"
@@ -70,7 +68,7 @@ function banner() {
     echo " +------------------------------------------------------------------------+"
 }
 
-function extract_pcap_data() {
+function pcap_ripper() {
 
     if [ "$proto" == "tcp" ]; then
         tshark -r ./Pcaps/Trims/$pcap_file -Y "tcp" -T fields \
@@ -97,7 +95,7 @@ function extract_pcap_data() {
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
             -e "tcp.dstport" -e "http.request.method" \
             -e "http.request.full_uri" -e "http.user_agent" \
-            -e "http.content_type" -e "http.content_length" \
+            -e "http.referer" -e "http.content_type" -e "http.content_length" \
             -e "http.response.code" -e "http.file_data" \
             -e "mime_multipart.header.content-type" \
             -e "mime_multipart.header.content-disposition" 2> /dev/null | \
@@ -120,11 +118,12 @@ function extract_pcap_data() {
             -e "dns.flags.rcode" -e "dns.flags.authoritative" \
             -e "dns.flags.recdesired" -e "dns.flags.recavail" \
             -e "dns.resp.type" -e "dns.resp.name" -e "dns.a" \
-            -e "dns.aaaa" -e "dns.mx.mail_exchange" -e "dns.ns" \
-            -e "dns.cname" -e "dns.txt" -e "dns.resp.ttl" -e "frame.number" \
-            -e "dns.response_to" -e "dns.retransmission" \
-            -e "dns.retransmit_response_in" 2> /dev/null | \
-            tr ',' ';' | awk -F'\t' '
+            -e "dns.ns" -e "dns.cname" -e "dns.ptr.domain_name" \
+            -e "dns.mx.mail_exchange" -e "dns.txt" -e "dns.aaaa" \
+            -e "dns.srv.name" -e "dns.srv.service" -e "dns.srv.port" \
+            -e "dns.resp.ttl" -e "frame.number" -e "dns.response_to" \
+            -e "dns.retransmission" -e "dns.retransmit_response_in" \
+            2> /dev/null | tr ',' ';' | awk -F'\t' '
                 {
                     for (i = 1; i <= NF; i++)
                     {
@@ -350,22 +349,22 @@ function tcp_data_analysis() {
     #echo "yaaaaaaaaaaaaa" && sleep 3
 }
 
-function parse_tcp_data() {
+function tcp_parser() {
 
     awk '
         function flag_name(f) 
         {
-            if (f ~ /02$/) return "Syn"
-            else if (f ~ /12$/) return "SynAck"
-            else if (f ~ /10$/) return "Ack"
-            else if (f ~ /04$/) return "Rst"
-            else if (f ~ /14$/) return "RstAck"
-            else if (f ~ /01$/) return "Fin"
-            else if (f ~ /11$/) return "FinAck"
-            else if (f ~ /00$/) return "Null"
-            else if (f ~ /08$/) return "Push"
-            else if (f ~ /18$/) return "PushAck"
-            else if (f ~ /29$/) return "Fin;Push;Urg"
+            if ( f ~ /02$/ ) { return "Syn" }
+            else if ( f ~ /12$/ ) { return "SynAck" }
+            else if ( f ~ /10$/ ) { return "Ack" }
+            else if ( f ~ /04$/ ) { return "Rst" }
+            else if ( f ~ /14$/ ) { return "RstAck" }
+            else if ( f ~ /01$/ ) { return "Fin" }
+            else if ( f ~ /11$/ ) { return "FinAck" }
+            else if ( f ~ /00$/ ) { return "Null" }
+            else if ( f ~ /08$/ ) { return "Push" }
+            else if ( f ~ /18$/ ) { return "PushAck" }
+            else if ( f ~ /29$/ ) { return "Fin;Push;Urg" }
             return "NPI"
         }
 
@@ -374,19 +373,19 @@ function parse_tcp_data() {
             has_syn = has_synack = has_ack = has_rst = has_rstack = has_fin = has_finack = has_null = has_push = has_pushack = has_xmas = 0
             split(flags_list[s], arr, " ")
 
-            for (i in arr) 
+            for ( i in arr ) 
             {
-                if (arr[i] == "Syn") has_syn = 1
-                else if (arr[i] == "SynAck") has_synack = 1
-                else if (arr[i] == "Ack") has_ack = 1
-                else if (arr[i] == "Rst") has_rst = 1
-                else if (arr[i] == "RstAck") has_rstack = 1
-                else if (arr[i] == "Fin") has_fin = 1
-                else if (arr[i] == "FinAck") has_finack = 1
-                else if (arr[i] == "Null") has_null = 1
-                else if (arr[i] == "Push") has_push = 1
-                else if (arr[i] == "PushAck") has_pushack = 1
-                else if (arr[i] == "Fin;Push;Urg") has_xmas = 1
+                if ( arr[i] == "Syn" ) { has_syn = 1 }
+                else if ( arr[i] == "SynAck" ) { has_synack = 1 }
+                else if ( arr[i] == "Ack" ) { has_ack = 1 }
+                else if ( arr[i] == "Rst" ) { has_rst = 1 }
+                else if ( arr[i] == "RstAck" ) { has_rstack = 1 }
+                else if ( arr[i] == "Fin" ) { has_fin = 1 }
+                else if ( arr[i] == "FinAck" ) { has_finack = 1 }
+                else if ( arr[i] == "Null" ) { has_null = 1 }
+                else if ( arr[i] == "Push" ) { has_push = 1 }
+                else if ( arr[i] == "PushAck" ) { has_pushack = 1 }
+                else if ( arr[i] == "Fin;Push;Urg" ) { has_xmas = 1 }
             }
 
             if ((has_syn && has_rstack) &&
@@ -448,14 +447,14 @@ function parse_tcp_data() {
         {
             session = $1
 
-            if (!(session in seen)) 
+            if ( !( session in seen ) ) 
             {
                 seen[session] = $0
                 src_ip[session] = $3
                 dst_ip[session] = $4
             }
 
-            if (!(session in timestamp_start)) 
+            if ( !( session in timestamp_start ) ) 
             {
                 timestamp_start[session] = $2
             }
@@ -464,20 +463,20 @@ function parse_tcp_data() {
 
             flag_key = session "|" $5
 
-            if (!(flag_key in flag_seen)) 
+            if ( !( flag_key in flag_seen ) ) 
             {
                 flag_seen[flag_key] = 1
                 fname = flag_name($5)
                 flags_list[session] = flags_list[session] " " fname
             }
 
-            if ($3 == src_ip[session]) 
+            if ( $3 == src_ip[session] ) 
             {
                 src_size[session] += $6
                 src_pkts[session] ++
             }
 
-            if ($3 == dst_ip[session]) 
+            if ( $3 == dst_ip[session] ) 
             {
                 dst_size[session] += $6
                 dst_pkts[session] ++
@@ -486,15 +485,15 @@ function parse_tcp_data() {
             total_size[session] += $6
             total_pkts[session] ++
 
-            if (NF > 8) 
+            if ( NF > 8 ) 
             {
                 payload = ""
-                for (i = 9; i <= NF; i++) 
+                for ( i = 9; i <= NF; i++ ) 
                 {
-                    payload = (payload == "") ? $i : payload ";" $i
+                    payload = ( payload == "" ) ? $i : payload ";" $i
                 }
 
-                if (payloads[session] == "") 
+                if ( payloads[session] == "" ) 
                 {
                     payloads[session] = "[" payload 
                 } 
@@ -506,13 +505,13 @@ function parse_tcp_data() {
         }
 
         END {
-            for (s in seen) 
+            for ( s in seen ) 
             {
                 split(seen[s], fields)
                 status = get_status(s)
                 duration = timestamp_end[s] - timestamp_start[s]
 
-                if (payloads[s] != "") 
+                if ( payloads[s] != "" ) 
                 {
                     payloads[s] = payloads[s] "]"
                 } 
@@ -546,7 +545,7 @@ function udp_data_analysis() {
             private_and_public; done
 }
 
-function parse_udp_data() {
+function udp_parser() {
 
     if [ -s "./Results/tr_icmp_udp.data" ]; then
         tr ',' ' ' < ./Results/tr_icmp_udp.data | \
@@ -574,7 +573,7 @@ function parse_udp_data() {
             #key ==> session_id, src_ip, dst_ip, src_port, dst_port
             key = $1 FS $3 FS $4 FS $6 FS $7
 
-            if (key in extra)
+            if ( key in extra )
                 print $0, extra[key]
             else
                 print $0, "NA NA"
@@ -584,9 +583,9 @@ function parse_udp_data() {
     awk '
         function icmp_flag_name(type, code) 
         {
-            if (type == 3)
+            if ( type == 3 )
             {
-                if (code == 3) return "port-unreachable"
+                if ( code == 3 ) return "port-unreachable"
                 else return "unreachable"
             }
 
@@ -598,12 +597,12 @@ function parse_udp_data() {
             has_unreachable = 0
             split(icmp_flags_list[s], arr, " ")
 
-            for (i in arr) 
+            for ( i in arr ) 
             {
-                if (arr[i] == "port-unreachable") has_unreachable = 1
+                if ( arr[i] == "port-unreachable" ) { has_unreachable = 1 }
             }
 
-            if (has_unreachable) return "Unreachable"
+            if ( has_unreachable ) { return "Unreachable" }
             return "NPI"
         }
 
@@ -613,7 +612,7 @@ function parse_udp_data() {
             #key 2 ==> dst_ip, src_ip, dst_port, src_port (B -> A)
             rev_key = $4 " " $3 " " $7 " " $6
 
-            if (!(fwd_key in first_seen) && !(rev_key in first_seen)) 
+            if ( !( fwd_key in first_seen ) && !( rev_key in first_seen ) ) 
             {
                 key = fwd_key
                 first_seen[key] = $0
@@ -622,10 +621,10 @@ function parse_udp_data() {
             } 
             else 
             {
-                key = (fwd_key in first_seen) ? fwd_key : rev_key
+                key = ( fwd_key in first_seen ) ? fwd_key : rev_key
             }
 
-            if (!(key in src_ip)) 
+            if ( !( key in src_ip ) ) 
             {
                 split(key, parts, " ")
                 src_ip[key] = parts[1]
@@ -634,7 +633,7 @@ function parse_udp_data() {
                 dst_port[key] = parts[4]
             }
 
-            if ($3 == src_ip[key]) 
+            if ( $3 == src_ip[key] ) 
             {
                 src_size[key] += $5
                 src_pkts[key] ++
@@ -648,26 +647,26 @@ function parse_udp_data() {
             total_size[key] += $5
             total_pkts[key] ++
 
-            if (!(key in timestamp_start)) 
+            if ( !( key in timestamp_start ) ) 
             {
                 timestamp_start[key] = $2
             }
 
             timestamp_end[key] = $2
 
-            if ($(NF - 1) ~ /^[0-9]+$/ && $NF ~ /^[0-9]+$/) 
+            if ( $(NF - 1) ~ /^[0-9]+$/ && $NF ~ /^[0-9]+$/ ) 
             {
                 icmp_type_val = $(NF - 1)
                 icmp_code_val = $NF
 
-                if (!(key in icmp_type_first)) 
+                if ( !( key in icmp_type_first ) ) 
                 {
                     icmp_type_first[key] = icmp_type_val
                     icmp_code_first[key] = icmp_code_val
                 }
 
                 flag_key = key "|" icmp_type_val "|" icmp_code_val
-                if (!(flag_key in flag_seen)) 
+                if ( !( flag_key in flag_seen ) ) 
                 {
                     flag_seen[flag_key] = 1
                     fname = icmp_flag_name(icmp_type_val, icmp_code_val)
@@ -675,15 +674,15 @@ function parse_udp_data() {
                 }
             }
 
-            if (NF > 9)
+            if ( NF > 9 )
             {
                 payload = ""
                 for ( i = 8; i < NF - 1; i++ ) 
                 {
-                    payload = (payload == "") ? $i : payload ";" $i
+                    payload = ( payload == "" ) ? $i : payload ";" $i
                 }
 
-                if (payloads[key] == "") 
+                if ( payloads[key] == "" ) 
                 {
                     payloads[key] = "[" payload
                 } 
@@ -695,14 +694,14 @@ function parse_udp_data() {
         }
 
         END {
-            for (k in first_seen) 
+            for ( k in first_seen ) 
             {
-                icmp_type_out = (k in icmp_type_first) ? icmp_type_first[k] : "NA"
-                icmp_code_out = (k in icmp_code_first) ? icmp_code_first[k] : "NA"
+                icmp_type_out = ( k in icmp_type_first ) ? icmp_type_first[k] : "NA"
+                icmp_code_out = ( k in icmp_code_first ) ? icmp_code_first[k] : "NA"
                 status = get_icmp_status(k)
-                duration = (timestamp_end[k] - timestamp_start[k])
+                duration = ( timestamp_end[k] - timestamp_start[k] )
 
-                if (payloads[k] != "") 
+                if ( payloads[k] != "" ) 
                 {
                     payloads[k] = payloads[k] "]"
                 } 
@@ -720,15 +719,15 @@ function parse_udp_data() {
     ' ./Results/sample.data > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
-function parse_http_data() {
+function http_parser() {
 
     awk '
         {
-            if ($5 != "Null" && $6 != "Null") 
+            if ( $5 != "Null" && $6 != "Null" ) 
             {
                 src = $5; dst = $6
             } 
-            else if ($3 != "Null" && $4 != "Null") 
+            else if ( $3 != "Null" && $4 != "Null" ) 
             {
                 src = $3; dst = $4
             } 
@@ -740,7 +739,7 @@ function parse_http_data() {
             key = $1 ":" src ":" dst ":" $7 ":" $8
             rev_key = $1 ":" dst ":" src ":" $8 ":" $7
 
-            if ($9 != "Null") 
+            if ( $9 != "Null" ) 
             {
                 req_id[key] = $1
                 req_time[key] = $2
@@ -756,9 +755,9 @@ function parse_http_data() {
                 req_data[key] = $15
                 req_seen[key] = 1
             }   
-            else if ($14 ~ /^[1-5][0-9][0-9]$/) 
+            else if ( $14 ~ /^[1-5][0-9][0-9]$/ ) 
             {
-                if (req_seen[rev_key]) 
+                if ( req_seen[rev_key] ) 
                 {
                     print req_id[rev_key], req_time[rev_key], req_src[rev_key], 
                     req_dst[rev_key], req_sport[rev_key], req_dport[rev_key], 
@@ -788,9 +787,9 @@ function parse_http_data() {
         }
 
         END {
-            for (k in req_seen) 
+            for ( k in req_seen ) 
             {
-                if (!(matched[k])) 
+                if ( !( matched[k] ) ) 
                 {
                     print req_id[k], req_time[k], req_src[k], req_sport[k],
                     req_dst[k], req_dport[k], req_method[k], req_uri[k],
@@ -801,7 +800,7 @@ function parse_http_data() {
         }' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
-function parse_dns_data() {
+function dns_parser() {
 
     awk '
 
@@ -810,14 +809,11 @@ function parse_dns_data() {
             if ( req_type == 1 ) { return "A" }
             else if ( req_type == 2 ) { return "NS" }
             else if ( req_type == 5 ) { return "CNAME" }
-            else if ( req_type == 6 ) { return "SOA" }
             else if ( req_type == 12 ) { return "PTR" }
             else if ( req_type == 15 ) { return "MX" }
             else if ( req_type == 16 ) { return "TXT" }
             else if ( req_type == 28 ) { return "AAAA" }
             else if ( req_type == 33 ) { return "SRV" }
-            else if ( req_type == 35 ) { return "NAPTR" }
-            else if ( req_type == 255 ) { return "ANY" }
             return "NPI"
         }
 
@@ -832,9 +828,11 @@ function parse_dns_data() {
             return "NPI"
         }
 
-        function responses(data)
+        function concat(X, Y, Z)
         {
-    
+            old = ( X[Y] == "" ) ? "[Null]" : "[" X[Y] "]"
+            new = ( X[Z] == "" ) ? "[Null]" : "[" X[Z] "]"
+            return old new
         }
 
         {
@@ -865,8 +863,15 @@ function parse_dns_data() {
 
             if ( $9 == "False" || $9 == 0 )
             {
+                session = src ":" dst ":" $7 ":" $8
+
+                if ( !( session in session_id ) )
+                {
+                    session_id[key] = $1
+                }
+
                 req_seen[key] = 1
-                session[key] = $1
+                timestamp[key] = $2
                 src_ip[key] = src
                 dst_ip[key] = dst
                 src_port[key] = $7
@@ -878,8 +883,8 @@ function parse_dns_data() {
                 rtype_string[key] = request_type(rtype_code[key])
             }
             else if ( $9 == "True" || $9 == 1 )
-            {   
-                rev_key_resp = dst ":" src ":" $8 ":" $7 ":" $10 ":" (( $( NF - 1 ) ==  "Null" ) ? $( NF - 3 ) : $NF)
+            {
+                rev_key_resp = dst ":" src ":" $8 ":" $7 ":" $10 ":" ( ( $( NF - 1 ) ==  "Null" ) ? $( NF - 3 ) : $NF )
                 count[rev_key_resp] ++
                 retransmit[rev_key_resp,count[rev_key_resp]] = rev_key
                 resp_seen[rev_key] = 1
@@ -889,18 +894,59 @@ function parse_dns_data() {
                 is_authoritative[rev_key] = $15
                 is_recdesired[rev_key] = $16
                 is_recavail[rev_key] = $17
+                rp_type_codes[rev_key] = $18
                 resp_names[rev_key] = $19
-                ttl[rev_key] = $26
+                ttl[rev_key] = $30
                 answers[rev_key] = ""
                 separator = ""
-        
-                for ( i = 20; i <= 25; i++ )
+
+                rp_codes = split(rp_type_codes[rev_key], rp, ";")
+
+                if ( rp_codes > 1 )
                 {
-                    if ( $i != "Null" )
+                    for ( i = 1; i <= rp_codes; i++ )
                     {
-                        answers[rev_key] = answers[rev_key] separator $i
-                        separator = ";"
+                        for ( j = 1; j < rp_codes; j++ )
+                        {
+                            if ( rp[j] > rp[j+1] )
+                            {
+                                value_code = rp[j]
+                                rp[j] = rp[j+1]
+                                rp[j+1] = value_code
+                            }
+                        }
                     }
+                }
+
+                rp_type_codes[rev_key] = ""
+
+                for ( i = 1; i <= rp_codes; i++ )
+                {
+                    rp_type_codes[rev_key] = rp_type_codes[rev_key] separator rp[i]
+                    string_code = request_type(rp[i])
+                    rp_type_strings[rev_key] = rp_type_strings[rev_key] (( string_code != "" ) ? separator string_code : "")
+                    separator = ";"
+                }
+
+                separator = ""
+
+                for ( it = 20; it <= 29; it++ )
+                {
+                    gsub(";", "/", $it)
+
+                    if ( $it != "Null" )
+                    {
+                        value = $it
+
+                        if ( it == 27 ) 
+                        {
+                            value = $27 "->" $28 "->" $29
+                            it = 29
+                        }
+
+                        answers[rev_key] = answers[rev_key] separator value
+                        separator = "/"
+                    }   
                 }
             }
         }
@@ -914,10 +960,11 @@ function parse_dns_data() {
                     for ( i = 1; i <= count[key]; i++ )
                     {
                         pkt = retransmit[key,i]
-                
+
                         if ( pkt in req_seen )
                         {
                             request = pkt
+                            break
                         }
                     }
 
@@ -927,8 +974,20 @@ function parse_dns_data() {
 
                         if ( !( pkt in req_seen ) )
                         {
-                            rptype_code[request] = "[" rptype_code[request] "][" rptype_code[pkt] "]"
-                            answers[request] = "[" answers[request] "][" answers[pkt] "]"
+                            rptype_string[request] = "[" rptype_string[request] "]" ((rptype_string[pkt] == "") ? "[Null]" : \
+                            "[" response_type(rptype_code[pkt]) "]")
+
+                            rptype_code[request] = concat(rptype_code, request, pkt)
+                            rp_type_codes[request] = concat(rp_type_codes, request, pkt)
+                            rp_type_strings[request] = concat(rp_type_strings, request, pkt)
+                            answers[request] = concat(answers, request, pkt)
+                            is_authoritative[request] = concat(is_authoritative, request, pkt)
+                            is_recdesired[request] = concat(is_recdesired, request, pkt)
+                            is_recavail[request] = concat(is_recavail, request, pkt)
+                            resp_names[request] = concat(resp_names, request, pkt)
+                            ttl[request] = concat(ttl, request, pkt)
+
+                            delete resp_seen[pkt]
                         }
                     }
                 }
@@ -936,23 +995,73 @@ function parse_dns_data() {
 
             for ( k in req_seen )
             {
+                clean = answers[k]
+                gsub(/\]\[/, " ", clean)
+                n_count = split(clean, n, " ")
+
+                for ( i = 1; i <= n_count; i++ )
+                {
+                    count_n[k] ++
+                }
+                
+                if ( answers[k] == "" )
+                {
+                    answers[k] = "[Empty]"
+                }
+
                 if ( k in resp_seen )
                 {
-                    #print session[k], src_ip[k], dst_ip[k], src_port[k], dst_port[k],
-                    #trans_id[k], domain[k], domain_lenght[k], rtype_code[k], rtype_string[k],
-                    #rptype_code[k], rptype_string[k], is_authoritative[k], is_recdesired[k],
-                    #is_recavail[k], resp_names[k], ttl[k], answers[k]
+                    add_info = ( count_n[k]+0 > 1) ? "Matched-With-Multiple-Answers" : "Matched"
+
+                    print session_id[k],
+                    timestamp[k],
+                    src_ip[k], dst_ip[k], 
+                    src_port[k], dst_port[k],
+                    trans_id[k], domain[k], 
+                    domain_lenght[k], rtype_code[k], 
+                    rtype_string[k], count_n[k]+0,
+                    rptype_code[k], rptype_string[k],
+                    rp_type_codes[k], rp_type_strings[k],
+                    is_authoritative[k], is_recdesired[k],
+                    is_recavail[k], resp_names[k],
+                    answers[k], ttl[k], add_info
                 }
 
                 if ( !( k in resp_seen ) )
                 {
-                    #print session[k], src_ip[k], dst_ip[k], src_port[k], dst_port[k],
-                    #trans_id[k], domain[k], domain_lenght[k], rtype_code[k], rtype_string[k],
-                    #rptype_code[k], rptype_string[k], is_authoritative[k], is_recdesired[k],
-                    #is_recavail[k], resp_names[k], ttl[k], answers[k]
+                    print session_id[k], 
+                    timestamp[k],
+                    src_ip[k], dst_ip[k], 
+                    src_port[k], dst_port[k],
+                    trans_id[k], domain[k], 
+                    domain_lenght[k], rtype_code[k], 
+                    rtype_string[k], count_n[k]+0,
+                    "Null", "Null", "Null", "Null",
+                    "Null", "Null", "Null",
+                    "Null", "Null", "Null", "Only-Query"
                 }
             }
-        }  ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+
+            for ( k in resp_seen )
+            {
+                if ( answers[k] == "" )
+                {
+                    answers[k] = "[Empty]"
+                }
+                
+                if ( !( k in req_seen ) )
+                {
+                    print $1, $2, dst, src,
+                    $8, $7, $10, $11, $12, $13,
+                    request_type($13), "1",
+                    rptype_code[k], rptype_string[k],
+                    rp_type_codes[k], rp_type_strings[k],
+                    is_authoritative[k], is_recdesired[k],
+                    is_recavail[k], resp_names[k],
+                    answers[k], ttl[k], "Only-Answer"
+                }
+            }
+        }' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function generate_results_tcp() {
@@ -1036,37 +1145,37 @@ function parse_pcap_data() {
         if [ -s "./Results/$data" ]; then
             if [ "$data" == "tcp.data" ]; then
                 type="tcp"
-                parse_tcp_data
+                tcp_parser
             elif [ "$data" == "udp.data" ]; then
                 type="udp"
-                parse_udp_data
+                udp_parser
             elif [ "$data" == "dns.data" ]; then
                 type="dns"
-                parse_dns_data
+                dns_parser
             elif [ "$data" == "http.data" ]; then
                 type="http"
-                parse_http_data
+                http_parser
             elif [ "$data" == "ssh.data" ]; then
                 type="ssh"
-                #parse_ssh_data
+                #ssh_parser
             elif [ "$data" == "smb2.data" ]; then
                 type="smb2"
-                #parse_smb2_data
+                #smb2_parser
             elif [ "$data" == "kerberos.data" ]; then
                 type="kerberos"
-                #parse_kerberos_data
+                #kerberos_parser
             elif [ "$data" == "ftp.data" ]; then
                 type="ftp"
-                #parse_ftp_data
+                #ftp_parser
             elif [ "$data" == "rpc.data" ]; then
                 type="rpc"
-                #parse_rpc_data
+                #rpc_parser
             elif [ "$data" == "dcerpc.data" ]; then
                 type="dcerpc"
-                #parse_dcerpc_data
+                #dcerpc_parser
             elif [ "$data" == "ntlm.data" ]; then
                 type="ntlm"
-                #parse_ntlm_data 
+                #ntlm_parser 
             fi
                 import_data "$flow_id" "$file_db" "$type" "$id_pcap_file"; fi; done
 }
@@ -1107,7 +1216,7 @@ function analyzer() {
         tee -a .logs.log
         for ((j = 0; j <= ${#protos[@]} - 1; j++)); do
             proto="${protos[$j]}"
-            extract_pcap_data; done
+            pcap_ripper; done
             parse_pcap_data
             rm ./Results/*.data; done
 
@@ -1146,7 +1255,7 @@ function main() {
     input_msg=" Please, enter a pcap file to be analyzed: "
 
     if [ "${#pcaps[@]}" -ne 0 ]; then
-        exists=0
+        continue=0
 
         for ((i = 0; i <= ${#pcaps[@]} - 1; i++)); do
             pcap_file="${pcaps[$i]}"
@@ -1155,20 +1264,41 @@ function main() {
             else
                 echo -n " [$i] $(basename $pcap_file)"; fi; done
 
-        while [ "$exists" -eq 0 ]; do
-            echo -e " \n\n " 
+        while [ "$continue" -eq 0 ]; do
+            echo -e " \n " 
             for ((i = 0; i <= ${#input_msg} - 1; i++)); do
                 echo -n "${input_msg:$i:1}" && sleep 0.02; done 
                 read pcap
 
             if [[ -f "./Pcaps/$pcap" ]]; then
-                exists=1
+                continue=1
                 echo -e "\n [+] Pcap selected ==> ${pcap}" >> .logs.log
+                echo -e "\n Loading..."
+                mapfile -t found_p < <(tshark -r ./Pcaps/$pcap -T fields -e "frame.protocols" 2> /dev/null | \
+                tr ':' '\n' | sort -u | grep -wE 'tcp|udp|http|dns|smb2|rpc|dcerpc|ntlm|kerberos|ftp|ssh|llmnr|tftp|dhcp|dhcpv6')
+
+                if [ "$arg1" == "--protocols" ] ||
+                   [ "$arg1" == "-p" ]; then
+
+                    for ((i = 0; i <= ${#protos[@]} - 1; i++)); do
+                        arg_proto="${protos[$i]}"
+                        for ((j = 0; j <= ${#found_p[@]} - 1; j++)); do
+                            proto_found="${found_p[$j]}"
+                            if [ "$arg_proto" == "$proto_found" ]; then
+                                protos_found+=($arg_proto); fi; done; done
+
+                    protos=("${protos_found[@]}")
+                            
+                elif [ "$arg1" == "--all" ] ||
+                     [ "$arg1" == "-a" ]; then
+                    protos=("${found_p[@]}"); fi          
             else
                 input_pcap_error; fi; done
 
-        if [ "$exists" -eq 1 ]; then
-            echo -e "\n\n [+] Trimming pcap ...."
+        if [ "${#protos[@]}" -gt 0 ]; 
+        then
+            echo -e "\n\n [+] Protocols Found ==> [${protos[*]}]"
+            echo -e "\n [+] Trimming pcap ...."
             if PcapSplitter -f ./Pcaps/$pcap -o ./Pcaps/Trims/ -m connection \
                 /dev/null 2>&1 | grep 'ERROR'; then
                 pcapplusplus_error
@@ -1196,9 +1326,10 @@ function main() {
                 2> /dev/null
             else
                 mergecap -w ./Pcaps/Trims/$RANDOM.pcap ./Pcaps/Trims/* \
-                2> /dev/null; fi; fi
-
-        analyzer
+                2> /dev/null; fi
+                analyzer
+        else
+            protocols_error; fi
     else
         echo -e "${red} [!] No stored pcaps found.\n${default}" | \
         tee -a .logs.log
@@ -1235,7 +1366,7 @@ function starting() {
 
     elif [ "$arg1" == "--all" ] ||
          [ "$arg1" == "-a" ]; then
-        protos=("${supported_protos[@]}")
+        protos=()
         no_error=1
 
     elif [ "$arg1" == "--protocols" ] ||
@@ -1245,43 +1376,16 @@ function starting() {
             show_help && exit
         else
             IFS=',' read -ra protos <<< "$arg2"
+            protos_found=()
             error=0
 
             for ((i = 0; i <= ${#protos[@]} - 1; ++i)); do
                 proto_arg="${protos[$i]}"
-                if [[ "$proto_arg" == "tcp" ||
-                      "$proto_arg" == "udp" ||
-                      "$proto_arg" == "http" ||
-                      "$proto_arg" == "dns" ||
-                      "$proto_arg" == "smb2" ||
-                      "$proto_arg" == "rpc" ||
-                      "$proto_arg" == "dcercp" ||
-                      "$proto_arg" == "ntlm" ||
-                      "$proto_arg" == "kerberos" ||
-                      "$proto_arg" == "ftp" ||
-                      "$proto_arg" == "ssh" ||
-                      "$proto_arg" == "llmnr" ||
-                      "$proto_arg" == "tftp" ||
-                      "$proto_arg" == "dhcp" ||
-                      "$proto_arg" == "dhcv6"
-                   ]]; then
-                    error=$((error + 1)); fi; done; fi
+                for ((j = 0; j <= ${#supported_protos[@]} - 1; ++j)); do
+                    supported_proto="${supported_protos[$j]}"
+                    if [ "$proto_arg" == "$supported_proto" ]; then
+                        error=$((error + 1)); fi; done; done; fi
 
-    elif [ "$arg1" == "--found-protocols" ] ||
-         [ "$arg1" == "-f" ]; then
-        
-        if [[ -f "$arg2" ]]; then
-            echo -e "\n [*] Searching for compatible protocols in the pcap file...\n" && sleep 2
-            mapfile -t found_p < <(tshark -r $arg2 -T fields -e "frame.protocols" 2> /dev/null | \
-            tr ':' '\n' | sort -u | grep -wE 'tcp|udp|http|dns|smb2|rpc|dcerpc|ntlm|kerberos|ftp|ssh|llmnr|tftp|dhcp|dhcpv6')
-            if [ "${#found_p[@]}" -gt 0 ]; then
-                for ((i = 0; i <= ${#found_p[@]} - 1; i++)); do
-                    echo -e "${yellow} [+] ${found_p[$i]} \n ${default}"
-                    done && exit 
-            else
-                echo -e "${red} [x] No protocols found.${default}" && exit; fi
-        else
-            input_pcap_error && exit 1; fi
     else
         show_help && exit 1; fi
 
@@ -1306,5 +1410,4 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
-
 
