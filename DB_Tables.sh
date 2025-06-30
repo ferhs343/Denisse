@@ -72,31 +72,6 @@ function import_udp_data() {
 EOF
 }
 
-function import_dns_data() {
-
-    sqlite3 ./Databases/"$db_file" 2>> .logs.log <<EOF
-    CREATE TABLE IF NOT EXISTS $table (
-        Session_Id INTEGER,
-        Timestamp REAL,
-        Src_Ip TEXT,
-        Dst_Ip TEXT,
-        Src_Port INTEGER,
-        Dst_Port INTEGER,
-        Dns_Query_Type_Code INTEGER,
-        Dns_Query_Type_Name TEXT,
-        Dns_Query_Domain TEXT,
-        Dns_Domain_Lenght INTEGER,
-        Dns_Response_Type_Code INTEGER,
-        Dns_Response_Type_Name TEXT,
-        Dns_Response INTEGER,
-        Dns_Response_Name TEXT,
-        Dns_Response_A TEXT,
-        Dns_Response_AAAA TEXT,
-        Dns_Response_TXT TEXT
-    );
-EOF
-}
-
 function import_http_data() {
 
     sqlite3 ./Databases/"$db_file" 2>> .logs.log <<EOF
@@ -119,6 +94,37 @@ function import_http_data() {
         Response_File_Data TEXT,
         MIME_Content_Type TEXT,
         MIME_Content_Disposition TEXT
+    );
+EOF
+}
+
+function import_dns_data() {
+
+    sqlite3 ./Databases/"$db_file" 2>> .logs.log <<EOF
+    CREATE TABLE IF NOT EXISTS $table(
+        Session_Id INTEGER,
+        Timestamp TEXT,
+        Src_Ip TEXT,
+        Dst_Ip TEXT,
+        Src_Port INTEGER,
+        Dst_Port INTEGER,
+        Transaction_ID TEXT,
+        Domain TEXT,
+        Domain_Length INTEGER,
+        Query_Type_Code INTEGER,
+        Query_Type_String TEXT,
+        Answers_Packets INTEGER,
+        Response_Code INTEGER,
+        Response_String TEXT,
+        Answers_Codes TEXT,
+        Answers_Strings TEXT,
+        Is_Authoritative TEXT,
+        Is_Recdesired TEXT,
+        Is_Recavail TEXT,
+        Resp_Names TEXT,
+        Answers TEXT,
+        TTL TEXT,
+        Additional_Info TEXT
     );
 EOF
 }
@@ -155,5 +161,6 @@ function import_data() {
 
     import_to_table
 }
+
 
 
