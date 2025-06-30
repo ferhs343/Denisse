@@ -35,3 +35,9 @@ function root_error() {
 
 	echo -e "${red}\n [x] ERROR, to run this you must be root. \n${default}"
 }
+
+
+function protocols_error() {
+
+	echo -e "${red}\n [x] An error occurred while finding compatible protocols in the pcap file.\n${default}"
+}
