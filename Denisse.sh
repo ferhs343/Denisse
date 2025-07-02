@@ -95,15 +95,16 @@ function pcap_ripper() {
             -e "ip.dst" -e "ipv6.src" -e "ipv6.dst" -e "tcp.srcport" \
             -e "tcp.dstport" -e "http.request.method" \
             -e "http.request.full_uri" -e "http.user_agent" \
-            -e "http.referer" -e "http.content_type" -e "http.content_length" \
-            -e "http.response.code" -e "http.file_data" \
-            -e "mime_multipart.header.content-type" \
-            -e "mime_multipart.header.content-disposition" 2> /dev/null | \
+            -e "http.referer" -e "http.content_type" \
+            -e "http.content_length" -e "http.response.code" \
+            -e "http.file_data" -e "mime_multipart.header.content-type" \
+            -e "mime_multipart.header.content-disposition" \
+            -e "http.request_in" -e "frame.number" 2> /dev/null | \
             tr ',' ';' | tr ' ' ':'| awk -F'\t' '
                 {
-                    for (i = 1; i <= NF; i++)
+                    for ( i = 1; i <= NF; i++ )
                     {
-                        if ($i == "") $i = "Null"
+                        if ( $i == "" ) $i = "Null"
                     }
 
                     OFS="\t"; print
@@ -125,9 +126,9 @@ function pcap_ripper() {
             -e "dns.retransmission" -e "dns.retransmit_response_in" \
             2> /dev/null | tr ',' ';' | awk -F'\t' '
                 {
-                    for (i = 1; i <= NF; i++)
+                    for ( i = 1; i <= NF; i++ )
                     {
-                        if ($i == "") $i = "Null"
+                        if ( $i == "" ) $i = "Null"
                     }
 
                     OFS="\t"; print
@@ -208,7 +209,6 @@ function install_dependencies() {
             if cmake .. &> /dev/null; then
                 control2=$((control2 + 1)); fi
 
-            cd ..
             if make install &> /dev/null; then
                 control2=$((control2 + 1)); fi
 
@@ -488,6 +488,7 @@ function tcp_parser() {
             if ( NF > 8 ) 
             {
                 payload = ""
+
                 for ( i = 9; i <= NF; i++ ) 
                 {
                     payload = ( payload == "" ) ? $i : payload ";" $i
@@ -574,9 +575,13 @@ function udp_parser() {
             key = $1 FS $3 FS $4 FS $6 FS $7
 
             if ( key in extra )
+            {
                 print $0, extra[key]
+            }
             else
+            {
                 print $0, "NA NA"
+            }
         }
     ' ./Results/tr_icmp_udp1.data ./Results/$data > ./Results/sample.data
 
@@ -585,8 +590,8 @@ function udp_parser() {
         {
             if ( type == 3 )
             {
-                if ( code == 3 ) return "port-unreachable"
-                else return "unreachable"
+                if ( code == 3 ) { return "port-unreachable" }
+                else { return "unreachable" }
             }
 
             else return "other"
@@ -677,6 +682,7 @@ function udp_parser() {
             if ( NF > 9 )
             {
                 payload = ""
+
                 for ( i = 8; i < NF - 1; i++ ) 
                 {
                     payload = ( payload == "" ) ? $i : payload ";" $i
@@ -722,6 +728,30 @@ function udp_parser() {
 function http_parser() {
 
     awk '
+
+        function ord(c)
+        {
+            return index(" !\"#$%&'\''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", c) + 31
+        }
+
+        function get_file_type(data)
+        {
+            if ( substr(data, 1, 8) == "4d534346" ) { return "CABInstaller" }
+            else if ( substr(data, 1, 8) == "25504446" ) { return "PDFDocument" }
+            else if ( substr(data, 1, 4) == "ffd8" ) { return "JPEGImage" }
+            else if ( substr(data, 1, 8) == "47494638" ) { return "GIFFile" }
+            else if ( substr(data, 1, 8) == "89504e47" ) { return "PNGImage" }
+            else if ( substr(data, 1, 8) == "504b0304" ) { return "PKZip" }
+            else if ( substr(data, 1, 6) == "1f8b08" ) { return "GZip" }
+            else if ( substr(data, 1, 10) == "7573746172" ) { return "TARFile" }
+            else if ( substr(data, 1, 16) == "d0cf11e0a1b11ae1" ) { return "MicrosoftFile" }
+            else if ( substr(data, 1, 2) == "4d5a" ) { return "ExecutableFile" }
+            else if ( substr(data, 1, 8) == "504b0304" ) { return "OfficeFile" }
+            else if ( substr(data, 1, 14) == "526172211a0700" ) { return "RARFile" }
+            else if ( substr(data, 1, 8) == "7f454c46" ) { return "UnixELF" }
+            return "NPI"
+        }
+
         {
             if ( $5 != "Null" && $6 != "Null" ) 
             {
@@ -736,68 +766,79 @@ function http_parser() {
                 next
             }
 
-            key = $1 ":" src ":" dst ":" $7 ":" $8
-            rev_key = $1 ":" dst ":" src ":" $8 ":" $7
+            if ( $9 != "Null" )
+            {
+                aux = $NF
+            }
+            else if ( $15 ~ /^[1-5][0-9][0-9]$/ )
+            {
+                aux = $(NF - 1)
+            }
+
+            key = $1 ":" src ":" dst ":" $7 ":" $8 ":" aux
+            rev_key = $1 ":" dst ":" src ":" $8 ":" $7 ":" aux
 
             if ( $9 != "Null" ) 
             {
-                req_id[key] = $1
-                req_time[key] = $2
-                req_src[key] = src
-                req_dst[key] = dst
-                req_sport[key] = $7
-                req_dport[key] = $8
-                req_method[key] = $9
-                req_uri[key] = $10
-                req_ua[key] = $11
-                req_type[key] = $12
-                req_len[key] = $13
-                req_data[key] = $15
                 req_seen[key] = 1
-            }   
-            else if ( $14 ~ /^[1-5][0-9][0-9]$/ ) 
-            {
-                if ( req_seen[rev_key] ) 
-                {
-                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], 
-                    req_dst[rev_key], req_sport[rev_key], req_dport[rev_key], 
-                    req_method[rev_key], req_uri[rev_key], req_ua[rev_key], 
-                    req_type[rev_key], req_len[rev_key], req_data[rev_key],
-                    $14, $12, $13, $15, $16, $17
+                session_id[key] = $1
+                timestamp[key] = $2
+                src_ip[key] = src
+                dst_ip[key] = dst
+                src_port[key] = $7
+                dst_port[key] = $8
+                method[key] = $9
+                full_uri[key] = $10
+                user_agent[key] = $11
+                referer[key] = $12
+                req_content_type[key] = $13
+                req_content_length[key] = $14
+                req_file_data[key] = $16
+                mime_content_type[key] = $17
+                mime_content_disposition[key] $18
+                boundary = ""
 
-                    matched[rev_key] = 1
+                if ( req_content_type[key] ~ /^multipart\/form-data/ )
+                {
+                    split(req_content_type[key], parts, "boundary=")
+                    boundary = parts[2]
+                    delimit = "0d0a0d0a"
+                    bound_hex = ""
+                    
+                    for ( i = 1; i <= length(boundary); i++ )
+                    {
+                        c = substr(boundary, i, 1)
+                        bound_hex = bound_hex sprintf("%02x", ord(c))
+                    }
+
+                    file_data = req_file_data[key]
+
+                    while ( match(file_data, bound_hex) )
+                    {
+                        rest = substr(file_data, RSTART + RLENGTH)
+
+                        if ( match(rest, delimit) )
+                        {
+                            content = substr(rest, RSTART + RLENGTH, 32)
+                            print content
+                            file_data = substr(rest, RSTART + RLENGTH + 32)
+                        }
+                        else
+                        {
+                            break
+                        }
+                    }
                 }
-                else
+            } 
+            else if ( $15 ~ /^[1-5][0-9][0-9]$/ )
+            {
+                if ( $16 != "Null" )
                 {
-                    req_id[rev_key] = $1
-                    req_time[rev_key] = $2
-                    req_src[rev_key] = dst
-                    req_dst[rev_key] = src
-                    req_sport[rev_key] = $7
-                    req_dport[rev_key] = $8
-
-                    print req_id[rev_key], req_time[rev_key], req_src[rev_key], 
-                    req_dst[rev_key], req_sport[rev_key], req_dport[rev_key], 
-                    "Null", "Null", "Null", "Null", "Null", "Null", $14, $12, 
-                    $13, $15, $16, $17
-
-                    matched[rev_key] = 1
+                    file_type[rev_key] = get_file_type($16)
+                    
                 }
             }
-        }
-
-        END {
-            for ( k in req_seen ) 
-            {
-                if ( !( matched[k] ) ) 
-                {
-                    print req_id[k], req_time[k], req_src[k], req_sport[k],
-                    req_dst[k], req_dport[k], req_method[k], req_uri[k],
-                    req_ua[k], req_type[k], req_len[k], req_data[k],
-                    "Null", "Null", "Null", "Null", "Null", "Null"
-                }
-            }
-        }' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
+        ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
 function dns_parser() {
@@ -1410,4 +1451,5 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
+
 
