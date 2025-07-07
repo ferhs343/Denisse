@@ -736,19 +736,51 @@ function http_parser() {
 
         function get_file_type(data)
         {
-            if ( substr(data, 1, 8) == "4d534346" ) { return "CABInstaller" }
-            else if ( substr(data, 1, 8) == "25504446" ) { return "PDFDocument" }
-            else if ( substr(data, 1, 4) == "ffd8" ) { return "JPEGImage" }
-            else if ( substr(data, 1, 8) == "47494638" ) { return "GIFFile" }
-            else if ( substr(data, 1, 8) == "89504e47" ) { return "PNGImage" }
-            else if ( substr(data, 1, 8) == "504b0304" ) { return "PKZip" }
-            else if ( substr(data, 1, 6) == "1f8b08" ) { return "GZip" }
-            else if ( substr(data, 1, 10) == "7573746172" ) { return "TARFile" }
-            else if ( substr(data, 1, 16) == "d0cf11e0a1b11ae1" ) { return "MicrosoftFile" }
-            else if ( substr(data, 1, 2) == "4d5a" ) { return "ExecutableFile" }
-            else if ( substr(data, 1, 8) == "504b0304" ) { return "OfficeFile" }
-            else if ( substr(data, 1, 14) == "526172211a0700" ) { return "RARFile" }
-            else if ( substr(data, 1, 8) == "7f454c46" ) { return "UnixELF" }
+            if ( substr(data, 1, 8) == "4d534346" ) 
+                return "CABInstaller"
+
+            else if ( substr(data, 1, 8) == "25504446" ) 
+                return "PDFDocument"
+
+            else if ( substr(data, 1, 4) == "ffd8" ) 
+                return "JPEGImage"
+
+            else if ( substr(data, 1, 8) == "47494638" ) 
+                return "GIFFile"
+
+            else if ( substr(data, 1, 8) == "89504e47" ) 
+                return "PNGImage"
+
+            else if ( substr(data, 1, 8) == "504b0304" ) 
+                return "PKZip"
+
+            else if ( substr(data, 1, 6) == "1f8b08" ) 
+                return "GZip"
+
+            else if ( substr(data, 1, 10) == "7573746172" ) 
+                return "TARFile"
+
+            else if ( substr(data, 1, 16) == "d0cf11e0a1b11ae1" ) 
+                return "MicrosoftFile"
+
+            else if ( substr(data, 1, 2) == "4d5a" ) 
+                return "ExecutableFile"
+
+            else if ( substr(data, 1, 8) == "504b0304" )    
+                return "OfficeFile"
+
+            else if ( substr(data, 1, 14) == "526172211a0700" ) 
+                return "RARFile"
+
+            else if ( substr(data, 1, 8) == "7f454c46" ) 
+                return "UnixELF"
+
+            else if ( substr(data, 1, 10) == "3c3f706870" ) 
+                return "PHPFile"
+
+            else if ( substr(data, 1, 14) == "3c254070616765" )
+                return "JSPFile"
+
             return "NPI"
         }
 
@@ -794,9 +826,17 @@ function http_parser() {
                 req_content_type[key] = $13
                 req_content_length[key] = $14
                 req_file_data[key] = $16
+                req_file_type[key] = ""
                 mime_content_type[key] = $17
-                mime_content_disposition[key] $18
+                form_filenames[key] = ""
+                form_files_type[key] = ""
+                form_files_data[key] = ""
                 boundary = ""
+
+                if ( req_file_data[key] != "Null" )
+                {
+                    req_file_type[key] = get_file_type(req_file_data[key])
+                }
 
                 if ( req_content_type[key] ~ /^multipart\/form-data/ )
                 {
@@ -815,29 +855,133 @@ function http_parser() {
 
                     while ( match(file_data, bound_hex) )
                     {
-                        rest = substr(file_data, RSTART + RLENGTH)
+                        file_data = substr(file_data, RSTART + RLENGTH)
+                        if ( match(file_data, delimit) )
+                        {
+                            file_data = substr(file_data, RSTART + RLENGTH)
+                            if ( match(file_data, bound_hex) )
+                            {
+                                raw_file = substr(file_data, 1, RSTART - 1)
 
-                        if ( match(rest, delimit) )
-                        {
-                            content = substr(rest, RSTART + RLENGTH, 32)
-                            print content
-                            file_data = substr(rest, RSTART + RLENGTH + 32)
-                        }
-                        else
-                        {
-                            break
+                                for ( i = length(raw_file); i >= 1; i -= 2 )
+                                {
+                                    byte = substr(raw_file, i - 1, 2)
+                                    if ( byte == "0d" )
+                                    {
+                                        file = substr(file_data, 1, i - 2)
+                                        form_files_type[key] = form_files_type[key] "[" get_file_type(file) "]"
+                                        form_files_data[key] = form_files_data[key] "[" file "]"
+                                        break
+                                    }
+                                }
+                            }
                         }
                     }
+
+                    if ( $18 != "Null" )
+                    {
+                        split($18, parts, ";")
+
+                        for ( i = 1; i <= length(parts); ++i )
+                        {
+                            if ( parts[i] ~ "filename" )
+                            {
+                                gsub("\"", "", parts[i])
+                                gsub("=", " ", parts[i])
+                                split(parts[i], two, " ")
+                                form_filenames[key] = form_filenames[key] "[" two[2] "]"
+                            }
+                        }
+                    }
+                }
+
+                if ( req_file_type[key] == "" )
+                {
+                    req_file_type[key] = "Null"
+                }
+
+                if ( form_filenames[key] == "" )
+                {
+                    form_filenames[key] = "Null"
+                }
+
+                if ( form_files_type[key] == "" )
+                {
+                    form_files_type[key] = "Null"
+                }
+
+                if ( form_files_data[key] == "" )
+                {
+                    form_files_data[key] = "Null"
                 }
             } 
             else if ( $15 ~ /^[1-5][0-9][0-9]$/ )
             {
-                if ( $16 != "Null" )
+                resp_seen[rev_key] = 1
+                resp_content_type[rev_key] = $13
+                resp_content_length[rev_key] = $14
+                response_code[rev_key] = $15
+                resp_file_data[rev_key] = $16
+                resp_file_type[rev_key] = ""
+
+                if ( resp_file_data[rev_key] != "Null" )
                 {
-                    file_type[rev_key] = get_file_type($16)
-                    
+                    resp_file_type[rev_key] = get_file_type(resp_file_data[rev_key])
+                }
+
+                if ( resp_file_type[rev_key] == "" )
+                {
+                    resp_file_type[rev_key] = "Null"
                 }
             }
+        }
+
+        END {
+
+            for ( k in req_seen )
+            {
+                if ( k in resp_seen )
+                {
+                    print session_id[k], timestamp[k],
+                    src_ip[k], dst_ip[k], src_port[k],
+                    dst_port[k], method[k], full_uri[k],
+                    user_agent[k], referer[k], req_content_type[k],
+                    req_content_length[k], req_file_type[k]+0,
+                    req_file_data[k], mime_content_type[k], 
+                    form_filenames[k], form_files_type[k], 
+                    form_files_data[k], response_code[k], 
+                    resp_content_type[k], resp_content_length[k]+0, 
+                    resp_file_type[k], resp_file_data[k], "Matched"
+                }
+
+                if ( !( k in resp_seen ) )
+                {
+                    print session_id[k], timestamp[k],
+                    src_ip[k], dst_ip[k], src_port[k],
+                    dst_port[k], method[k], full_uri[k],
+                    user_agent[k], referer[k], req_content_type[k],
+                    req_content_length[k]+0, req_file_type[k],
+                    req_file_data[k], mime_content_type[k], 
+                    form_filenames[k], form_files_type[k], 
+                    form_files_data[k], "0", "Null", "0",
+                    "Null", "Null", "Only-Request"
+                }
+            }
+
+            for ( k in resp_seen )
+            {
+                if ( !( k in req_seen ) )
+                {
+                    print $1, $2, dst, src, $8, $7,
+                    "Null", "Null", "Null", "Null",
+                    "Null", "0", "Null", "Null",
+                    "Null", "Null", "Null", "Null",
+                    response_code[k], resp_content_type[k], 
+                    resp_content_length[k]+0, resp_file_type[k], 
+                    resp_file_data[k], "Only-Response"
+                }
+            }
+        }
         ' ./Results/"$data" > "./Results/${type}_${id_pcap_file}.parsed"
 }
 
@@ -1237,7 +1381,7 @@ function analyzer() {
     rpc=0; dcerpc=0; ntlm=0; kerberos=0
     ftp=0; ssh=0; llmnr=0
 
-    while [ -e "$file_db" ]; do
+    while [ -e "./Databases/${file_db}" ]; do
         id_db=$((id_db + 1))
         file_db="Database_${id_db}.db"; done
 
@@ -1451,5 +1595,3 @@ if [ "$(id -u)" == "0" ]; then
 else
     root_error
     exit 3; fi
-
-
