@@ -85,15 +85,21 @@ function import_http_data() {
         Method TEXT,
         URI TEXT,
         User_Agent TEXT,
+        Referer TEXT,
         Request_Content_Type TEXT,
-        Request_Content_Length INT,
-        Request_File_Data TEXT,
-        Response_Code INT,
+        Request_Content_Length INTEGER,
+        Request_File_Type TEXT,
+        Request_File_Raw TEXT,
+        Form_Content_Type TEXT,
+        Form_File_Names TEXT,
+        Form_File_Types TEXT,
+        Form_File_Data TEXT,
+        Response_Code INTEGER,
         Response_Content_Type TEXT,
-        Response_Content_Length INT,
-        Response_File_Data TEXT,
-        MIME_Content_Type TEXT,
-        MIME_Content_Disposition TEXT
+        Response_Content_Length INTEGER,
+        Response_File_Type TEXT,
+        Response_File_Raw TEXT,
+        Additional_Info TEXT
     );
 EOF
 }
