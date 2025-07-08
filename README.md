@@ -87,29 +87,3 @@ Tras unos pocos minutos de análisis, Denisse alertará sobre los hallazgos dete
   "connStatus": "Fin-only"
 }
 ```
-
-## IMPORTANTE: Dato a tener en cuenta
-
-Como se mencionó anteriormente, Denisse utiliza **`PcapPlusPlus`**, este es una librería de C++ de código abierto diseñada para capturar, analizar y manipular tráfico de red. Denisse lo implementa para recortar archivos PCAP dependiendo de su tamaño, con el objetivo de tener un rendimiento y uso de memoria eficaz al manipular el mismo. Sin embargo, es posible que al momento de que Denisse realice el recorte del archivo Pcap mediante PcapPlusPlus se obtenga el siguiente error:
-
-<div align="center">
-<img width="533" alt="image" src="https://github.com/user-attachments/assets/bc70a425-3d03-4449-9f70-0aa5fd7fcaf7" />
-</div>
-
-Al momento de la publicación de Denisse se desconoce si este error ocurre en todos los equipos, sin embargo, sí experimentas de manera persistente este error, sigue los siguientes pasos para dar solución a este error:
-
-  - Al interior de la carpeta de este proyecto, abre con cualquier editor de texto (nano, vim, etc) el siguente archivo: **`PcapPlusPlus/Pcap++/src/PcapFileDevice.cpp`**
-<div align="center">
-<img width="367" alt="image" src="https://github.com/user-attachments/assets/9a715d65-68ef-45e7-8c23-6951fd5dd845" />
-</div>
-
-  - Localiza la función **`bool PcapFileWriterDevice::open`**
-<div align="center">
-<img width="919" alt="image" src="https://github.com/user-attachments/assets/e1da12ab-33d8-43aa-9d4c-120495544efe" />
-</div>
-
-  - Reemplaza el contenido de la función con el código que se encuentra en el archivo **`PcapPlusPlus_error_solution`** dentro del repositorio de Denisse.
-  - Dirígete a la ruta **`PcapPlusPlus/build/`** y ejecuta los siguientes comandos para compilar nuevamente:
-      - `cmake ..`
-      - `make install`
-
