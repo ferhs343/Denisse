@@ -1300,13 +1300,13 @@ function generate_results_tcp() {
     output_pcap="ALERT_INFO_${id_result}.pcap"
     output_json="ALERT_INFO_${type}_${id_result}_.json"
     awk -v pattern="^($filter_json)$" '$1 ~ pattern' ./Results/$filename \
-    > ./Results/result_logs.data
+    > ./Results/.result_logs.data
     generate_json_logs
 
     tshark -r "./Pcaps/Trims/${flow_data}.pcap" -Y "${filter_pcap}" \
     -w "./Results/${output_pcap}" 2> /dev/null
 
-    echo -e "\n\t ${red}[!]${default} [$alert] ==> [$output_pcap] [$output_json]" | \
+    echo -e "\n ${red}[!]${default} [$alert] ==> [$output_pcap] [$output_json]" | \
     tee -a .logs.log
     id_result=$((id_result + 1))
 }
@@ -1484,7 +1484,7 @@ function main() {
         then
             echo -e "\n\n [+] Protocols Found ==> [${protos[*]}]"
             echo -e "\n [+] Trimming pcap ...."
-            if PcapSplitter -f ./Pcaps/$pcap -o ./Pcaps/Trims/ -m connection \
+            if PcapSplitter -f ./Pcaps/$pcap -o ./Pcaps/Trims -m connection \
                 /dev/null 2>&1 | grep 'ERROR'; then
                 pcapplusplus_error
                 find ./Pcaps/Trims/ -type f -print0 | xargs -0 rm; fi
