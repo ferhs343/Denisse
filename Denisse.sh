@@ -1414,11 +1414,14 @@ function analyzer() {
 
     for ((i = 0; i <= ${#id_pcap_files[@]}; i++)); do 
         flow_data="${id_pcap_files[$i]}"
+        type=""
         for flow in ./Results/*_"$flow_data".parsed; do
             filename=$(basename $flow) 
             if [[ "$filename" == tcp_* ]]; then
+                type="tcp"
                 tcp_data_analysis
             elif [[ "$filename" == udp_* ]]; then
+                type="udp"
                 udp_data_analysis; fi; done; done
 }
 
@@ -1484,10 +1487,7 @@ function main() {
         then
             echo -e "\n\n [+] Protocols Found ==> [${protos[*]}]"
             echo -e "\n [+] Trimming pcap ...."
-            if PcapSplitter -f ./Pcaps/$pcap -o ./Pcaps/Trims -m connection \
-                /dev/null 2>&1 | grep 'ERROR'; then
-                pcapplusplus_error
-                find ./Pcaps/Trims/ -type f -print0 | xargs -0 rm; fi
+            PcapSplitter -f ./Pcaps/$pcap -o ./Pcaps/Trims/ -m connection 1>> .logs.log
 
             n_pcaps=$(ls ./Pcaps/Trims/ | wc -l)
             echo -e "\n [+] Pcap cut to ${n_pcaps} sessions" >> .logs.log
@@ -1513,6 +1513,7 @@ function main() {
                 mergecap -w ./Pcaps/Trims/$RANDOM.pcap ./Pcaps/Trims/* \
                 2> /dev/null; fi
                 analyzer
+                #find ./Pcaps/Trims/ -type f -print0 | xargs -0 rm
         else
             protocols_error; fi
     else
