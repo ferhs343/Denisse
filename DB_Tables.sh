@@ -5,22 +5,24 @@ function import_to_table() {
     sqlite3 ./Databases/$db_file 2>> .logs.log <<EOF
 .mode csv
 .separator ","
-.import data.csv $table
+.import ${4}_${3}.csv $table
 EOF
 
-    rm data.csv
+    if [[ -f "${4}_${3}.csv" ]]; then
+        rm ${4}_${3}.csv 
+    fi
 }
 
 function csv_convert() {
 
     awk '
     {
-        for (i = 1; i <= NF; i++)
+        for ( i = 1; i <= NF; i++ )
         {
             printf("%s%s", $i, (i<NF ? "," : "\n"))
         }
     } 
-    ' $sample_data > data.csv
+    ' $sample_data > ${4}_${3}.csv
 }
 
 function import_tcp_data() {
@@ -137,7 +139,7 @@ EOF
 
 function import_data() {
 
-    sample_data="./Results/${3}_${4}.parsed"
+    sample_data="./Results/${5}/Data/${4}_${3}.parsed"
     db_file="$2"
     table="Flow_${1}_${3}"
     csv_convert
@@ -151,19 +153,26 @@ function import_data() {
     elif [ "$3" == "http" ]; then
         import_http_data
     elif [ "$3" == "ssh" ]; then
-        import_ssh_data
+        #import_ssh_data
+        true
     elif [ "$3" == "smb2" ]; then
-        import_smb2_data
+        #import_smb2_data
+        true
     elif [ "$3" == "kerberos" ]; then
-        import_kerberos_data
+        #import_kerberos_data
+        true
     elif [ "$3" == "ftp" ]; then
-        import_ftp_data
+        #import_ftp_data
+        true
     elif [ "$3" == "rpc" ]; then
-        import_rpc_data
+        #import_rpc_data
+        true
     elif [ "$3" == "dcerpc" ]; then
-        import_dcerpc_data
+        #import_dcerpc_data
+        true
     elif [ "$3" == "ntlm" ]; then
-        import_ntlm_data; fi
+        #import_ntlm_data
+        true; fi
 
     import_to_table
 }
