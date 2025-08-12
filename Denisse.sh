@@ -1685,11 +1685,14 @@ if [ "$(id -u)" == "0" ]; then
     echo -e "\n Loading ... \n" && sleep 2
     check_dependencies
     echo -e "\n$(
+    
         for ((i = 0; i <= 100; ++i)); do 
             echo -n "/"; done
             echo -e "\n\n $(date) \n"
+            
         for ((i = 0; i <= 100; ++i)); do 
             echo -n "/"; done
+            
     )\n" >> .logs.log
 
     chmod a+rw ./Results/ && chmod -R a+rw ./Pcaps/ && chmod a+rw ./Databases/
