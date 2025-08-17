@@ -33,7 +33,7 @@ function lf_banner()
     echo -e "         ) ) )             ${d};. :   ${s}~#@#%(\" .,$ @${d}"
     echo -e "      (${r}~~~~~~~~~${d})          ;${f}==${d}: ${s}.\"^ ';${d}     "
     echo -e "       | ${f}POWER${d} |           ;. : ${r}..${d}  "
-    echo -e "       |       |           ;${f}==${d}:${f}.${d}  :      ${g}PCAP log factory: Gears${d}"
+    echo -e "       |       |           ;${f}==${d}:${f}.${d}  :      ${g}PCAP Log Factory: Gears${d}"
     echo -e "       I     ${y} _._${d}          ;. :${f} ==${d}:      ${g}heat and packages; this${d} "
     echo -e "       I    ${y}/'   \`\  ${d}      ;${f}==${d}:.  :      ${g}is how intelligence is ${d}"
     echo -e "       I   ${y}|   N   |${d}       ;. :${f} ==${d}:      ${g}forged.${d}"
@@ -42,13 +42,13 @@ function lf_banner()
     echo -e "   /'______${y}|${d}___||__${y}###${d}___|____|.__: "
 }
 
-function lg_banner()
+function td_banner()
 {
 
     echo ""
     echo "         ⣠⣴⣾⣿⣿⣿⣿⣿⣿⣶⣤⣄⠀⠀⠀⠀⠀⠀⠀⠀ "
     echo "       ⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣄⠀⠀⠀⠀⠀                 "
-    echo -e "     ⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣆⠉⠉⢉⣿⣿⣿${o}⣷⣦⣄⡀${d}        PCAP log hunter"
+    echo -e "     ⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣆⠉⠉⢉⣿⣿⣿${o}⣷⣦⣄⡀${d}        PCAP Threat Detection"
     echo -e "    ⠚⢛⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿${o}⣿⣿⣿⣿⡄${g}                                           -----+  ${d}"
     echo -e "    ⢠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠿${o}⠿⠿⠿⣿⡇${d}       "Another day, another packet storm."       ${g}|${d}"
     echo -e "   ⢀⣿⡿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠋⠁⠀⠀    ${o}⠈⠃${g}          =>${d} Unusual traffic? Blame the intern. ${g}|${d}"
