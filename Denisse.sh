@@ -230,24 +230,23 @@ function tcp_parser()
         }' ./Results/"$data" > "./Results/${data_dir}/Data/${id_pcap_file}_${type}.parsed"
 }
 
-function private_and_public() {
+function pre_rule_tcp_Port_Scan() {
 
-    conn_status=($(awk '{print $NF}' ./Results/$filename.tmp | sort -u))
+    conn_status=($(awk '{print $NF}' ./Results/$data_pcap_f/Data/$1 | sort -u))
     src=()
     dst=()
 
     echo -e "\n [+] TCP/UDP Connection Status ==> [${conn_status[*]}]" >> .logs.log
 
-    for ((l = 0; l <= ${#conn_status[@]} - 1; l++)); do
+    for ((l = 0; l < ${#conn_status[@]}; l++)); do
         status="${conn_status[$l]}"
-        if [[ ("$filename" == tcp_* && ("$status" != "NPI" &&
-               "$status" != "Finished-payload" &&
-               "$status" != "Reseted-payload")) ||
-              ("$filename" == udp_* && ("$status" == "Established")) 
+        if [[ "$status" != "NPI" &&
+              "$status" != "Finished-payload" &&
+              "$status" != "Reseted-payload"
             ]]; then
             src=($(
                 awk -v status="$status" '$NF == status {print $3}' \
-                    ./Results/$filename.tmp | sort | uniq -c | sort -rn |
+                    ./Results/$data_pcap_f/Data/$1 | sort | uniq -c | sort -rn |
                     awk '$1 > 2 {print $2}'
             ))
             for ((m = 0; m <= ${#src[@]} - 1; m++)); do
@@ -256,7 +255,7 @@ function private_and_public() {
                     awk -v status="$status" \
                         -v src_ip="$src_ip" \
                         '$NF == status && $3 == src_ip {print $4}' \
-                        ./Results/$filename.tmp | sort -u
+                        ./Results/$data_pcap_f/Data/$1 | sort -u
                 ))
                 #case 1 : 1 ==> 1
                 if [ ${#dst[@]} -eq 1 ]; then
@@ -266,16 +265,17 @@ function private_and_public() {
                             -v src_ip="$src_ip" \
                             -v dst_ip="$dst_ip" \
                             '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                            ./Results/$filename.tmp | sort -u | wc -l
+                            ./Results/$data_pcap_f/Data/$1 | sort -u | wc -l
                     )
 
                     echo -e "\n [+] TCP/UDP Vertical Scan proof - No. Ports ==> [$n_ports]" >> .logs.log
 
                     if [ "$n_ports" -gt 10 ]; then
                         vertical_scan=1
-                        if [[ "$filename" == tcp_* ]]; then tcp=1; else udp=1; fi
                         alert="${src_type} ${VPS}"
-                        generate_results_tcp "$dst_ip"; fi
+                        echo $alert
+                        #generate_results_tcp "$dst_ip";
+                    fi
                 else
                     #case 2 : 1 ==> N
                     ports_a=()
@@ -286,23 +286,23 @@ function private_and_public() {
                                 -v src_ip="$src_ip" \
                                 -v dst_ip="$dst_ip" \
                                 '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                                ./Results/$filename.tmp | sort -u | wc -l
+                                ./Results/$data_pcap_f/Data/$1 | sort -u | wc -l
                         )
 
                         echo -e "\n [+] TCP/UDP Vertical Scan proof - No. Ports ==> [$n_ports]" >> .logs.log
 
                         if [ "$n_ports" -gt 10 ]; then
                             vertical_scan=1
-                            if [[ "$filename" == tcp_* ]]; then tcp=1; else udp=1; fi
                             alert="${src_type} ${VPS}"
-                            generate_results_tcp "$dst_ip"
+                            echo $alert
+                            #generate_results_tcp "$dst_ip"
                         else
                             ports=$(
                                 awk -v status="$status" \
                                     -v src_ip="$src_ip" \
                                     -v dst_ip="$dst_ip" \
                                     '$NF == status && $3 == src_ip && $4 == dst_ip {print $6}' \
-                                    ./Results/$filename.tmp | sort -u
+                                    ./Results/$data_pcap_f/Data/$1 | sort -u
                             )
                             ports_a+=("$ports"); fi; done
 
@@ -329,9 +329,10 @@ function private_and_public() {
 
                     if [ "${#multiple_dst[@]}" -gt 0 ]; then
                         horizontal_scan=1
-                        if [[ "$filename" == tcp_* ]]; then tcp=1; else udp=1; fi
                         alert="${src_type} ${HPS}"
-                        generate_results_tcp "${multiple_dst[@]}"; fi
+                        echo $alert
+                        #generate_results_tcp "${multiple_dst[@]}"; 
+                        fi
                         fi; done; fi; done
 }
 
@@ -811,11 +812,11 @@ function dns_parser()
                 next
             }
 
-            if ( $9 == "False" || $9 == 0 )
+            if ( $9 == "False" )
             {
                 aux = $(NF - 3)
             }
-            else if ( $9 == "True" || $9 == 1 )
+            else if ( $9 == "True" )
             {
                 aux = ( $( NF - 1 ) == "Null" ) ? $( NF - 2 ) : $NF
             }
@@ -977,8 +978,8 @@ function dns_parser()
 
                     print session_id[k], timestamp[k], src_ip[k], dst_ip[k], src_port[k], dst_port[k],
                     trans_id[k], domain[k], domain_lenght[k], rtype_code[k], rtype_string[k], count_n[k]+0,
-                    rptype_code[k], rptype_string[k], rp_type_codes[k], rp_type_strings[k],
-                    is_authoritative[k], is_recdesired[k], is_recavail[k], resp_names[k], answers[k], ttl[k], 
+                    rptype_code[k], rptype_string[k], rp_type_codes[k], rp_type_strings[k], is_authoritative[k], 
+                    is_recdesired[k], is_recavail[k], resp_names[k], answers[k], ttl[k], 
                     add_info
                 }
 
@@ -1271,16 +1272,22 @@ function cleaning()
                 echo "[ERROR]"; fi
             sleep 1; fi; done
 
-    ulimit -n $default_limit_files 1> /dev/null
-    find ./Results/${data_dir}/Trims/ -type f ! -name '[0-9]*' -print0 | xargs -0 rm
-    rm ./Results/*.data 2> /dev/null
+    if [ "$main_option" -eq 1 ]; then 
+        ulimit -n $default_limit_files 1> /dev/null
+        find ./Results/${data_dir}/Trims/ -type f ! -name '[0-9]*' -print0 | xargs -0 rm
+        rm ./Results/*.data 2> /dev/null
+
+    elif [ "$main_option" -eq 2 ]; then
+        rm -r ./Results/$data_pcap_f/Data/ 2> /dev/null
+        rm -r ./Results/$data_pcap_f/Trims/ 2> /dev/null; fi
+
     exit 130
 }
 
-function pcap_log_hunter()
+function pcap_threat_detection()
 {
 
-    clear && lg_banner
+    clear && td_banner
     echo -e "${c}\n [*] Menu Options\n${d}"
     echo -e " [1] Back To Main Menu."
     echo -e " [2] Show Help Panel"
@@ -1288,14 +1295,9 @@ function pcap_log_hunter()
 
     mapfile -t data_pcaps < <(ls -1 ./Results/ 2> /dev/null)
     mapfile -t user_rules < <(declare -F | awk '{print $3}' | grep '^rule_')
+    mapfile -t predefined_rules < <(declare -F | awk '{print $3}' | grep '^pre_rule_')
     input_msg=" Please, Enter a command or a menu option: "
-
-    rules=(
-        "TCP Port Scan"
-        "UDP Port Scan"
-        "DNS Suspicious Domains"
-        "HTTP Web Shells"
-    )
+    hunt_msg=" Come on, man, where are you hiding? ...."
 
     declare -A data_pcap_dic
     declare -A rules_dic
@@ -1308,16 +1310,16 @@ function pcap_log_hunter()
             echo -e "${c}\n [*] Stored Pcaps Data\n${d}"
             option_id="P"
         else
-            options=("${rules[@]}")
+            options=("${predefined_rules[@]}")
             echo -e "${c}\n [*] Rules\n${d}"
             option_id="R"; fi
 
         if [ "${#options[@]}" -gt 0 ]; 
         then
             for ((j = 0; j < ${#options[@]}; j++)); do
-                value_option="${options[$j]}"
+                [ "$i" -eq 1 ] && value_option=$(echo "${options[$j]}" | tr '_' ' ' | cut -d' ' -f3-) || value_option="${options[$j]}"
                 printf " [%s%d] %-*s" "$option_id" "$count" "$width" "$value_option"
-                [ "$i" -eq 0 ] && data_pcap_dic[P${count}]=$value_option || rules_dic[R${count}]=$value_option
+                [ "$i" -eq 0 ] && data_pcap_dic[P${count}]=$value_option || rules_dic[R${count}]="${options[$j]}"
                 if (( count % 2 == 0 )); then
                     echo; fi
                     count=$((count + 1)); done
@@ -1328,7 +1330,8 @@ function pcap_log_hunter()
             echo -e "${f} [!] No stored data found.${d}"; fi; done
             [ "${#user_rules[@]}" -gt 0 ] && echo -e " .... More Rules.\n" || echo -e "\n"
 
-    if [ "${#user_rules[@]}" -gt 0 ]; then
+    if [ "${#user_rules[@]}" -gt 0 ]; 
+    then
         for ((i = 0; i < ${#user_rules[@]}; i++)); do
             rule_name="${user_rules[$i]}"
             rules_dic[R${count}]=$rule_name
@@ -1354,6 +1357,87 @@ function pcap_log_hunter()
 
                 n_proc=$(nproc)
                 IFS=';' read -ra parts <<< "${option}"
+                data_pcap_f="${data_pcap_dic[${parts[0]}]}"
+                trap cleaning SIGINT SIGTSTP
+
+                if [[ -n "$data_pcap_f" ]]; 
+                then
+                    if [[ -f "./Results/$data_pcap_f/Data.tar.zst" && 
+                          -f "./Results/$data_pcap_f/Trims.tar.zst" ]]; then
+                        error_r=0; begin=0
+                        if [ "${parts[1]}" != "*" ]; then
+                            IFS=',' read -ra input_rules <<< "${parts[1]}"
+                            for ((i = 0; i < "${#input_rules[@]}"; i++)); do
+                                input_rule="${input_rules[$i]}"
+                                if [[ ! -n "${rules_dic[$input_rule]}" ]]; then
+                                    error_r=$((error_r + 1)); fi ; done
+                        else
+                            for ((i = 0; i < $((count - 1)); i++)); do
+                                input_rules+=("R$((i + 1))"); done ; fi
+                    
+                        if [[ "$error_r" -eq 0 ||
+                              "${parts[1]}" == "*" ]]; then
+                            begin=$((begin + 1))
+                        else
+                            input_rule_error; fi
+
+                        if { [[ "${parts[2]}" =~ ^[0-9]+$ ]] && [ "${parts[2]}" -gt 0 ] && [ "${parts[2]}" -le "$n_proc" ]; } || [ "${parts[2]}" == "" ]; then
+                            begin=$((begin + 1))
+                        else
+                            process_error "$n_proc"; fi
+
+                        if [ "$begin" -eq 2 ]; then
+                            echo -e "\n Preparing .... \n"
+                            echo -e "\n [+] Data File selected ==> ${data_pcap_f}" >> .logs.log
+                            echo -e "\n [+] Rules execution ==> [${input_rules[*]}]" >> .logs.log
+                            id_detections_dir=1
+                            detections_dir="Detections_${id_detections_dir}"
+
+                            while [ -d "./Results/$data_pcap_f/$detections_dir" ]; do
+                                id_detections_dir=$((id_detections_dir + 1))
+                                detections_dir="Detections_${id_detections_dir}"; done
+
+                            mkdir ./Results/$data_pcap_f/$detections_dir/
+                            chmod -R a+rw ./Results/$data_pcap_f/$detections_dir/
+                            tar -I zstd -xf ./Results/$data_pcap_f/Data.tar.zst -C ./Results/$data_pcap_f/
+                            tar -I zstd -xf ./Results/$data_pcap_f/Trims.tar.zst -C ./Results/$data_pcap_f/
+                            mapfile -t data_files < <(ls -1 ./Results/$data_pcap_f/Data/ 2> /dev/null)
+
+                            typewriter "$hunt_msg" "$r" "$d" && echo -e "\n"
+                            [ "${parts[2]}" == "" ] && max_proc=$(($(nproc)/2)) || max_proc="${parts[2]}"
+
+                            for ((i = 0; i < "${#data_files[@]}"; i++)); do
+                                data_file="${data_files[$i]}"
+                                proto_data_file="${data_file#*_}"
+                                proto_data_file="${proto_data_file%%.*}"
+                                n_jobs=$(jobs -rp | wc -l)
+
+                                for ((j = 0; j < "${#input_rules[@]}"; j++)); do
+                                    in_rl="${input_rules[$j]}"
+                                    rule_function="${rules_dic[$in_rl]}"
+
+                                    if [[ "$rule_function" =~ ^rule_ ]]; then
+                                        proto_rule=$(echo "$rule_function" | cut -d'_' -f2)
+
+                                    elif [[ "$rule_function" =~ ^pre_rule_ ]]; then
+                                        proto_rule=$(echo "$rule_function" | cut -d'_' -f3); fi
+
+                                    if [ "$proto_data_file" == "$proto_rule" ]; 
+                                    then
+                                        while [ "$n_jobs" -ge "$max_proc" ]; do
+                                            wait -n
+                                            n_jobs=$(jobs -rp | wc -l); done
+
+                                        $rule_function "$data_file" &
+                                        fi ; done ; done
+
+                            wait
+                            rm -r ./Results/$data_pcap_f/Data/ 2> /dev/null
+                            rm -r ./Results/$data_pcap_f/Trims/ 2> /dev/null; fi
+                    else 
+                        input_data_file_error_2; fi
+                else
+                    input_data_file_error_1; fi 
             ;;
             *) option_error ;; esac; done
 }
@@ -1663,7 +1747,7 @@ function main()
     clear && main_banner
     echo -e "${c}\n [*] Menu Options\n${d}"
     echo -e " [1] Enter to PCAP Log Factory"
-    echo -e " [2] Enter to PCAP Log Hunter"
+    echo -e " [2] Enter to PCAP Threat Detection"
     echo -e " [3] Enter to Hunting Center"
     echo -e " [4] Exit \n"
 
@@ -1673,9 +1757,10 @@ function main()
     while true; do
         typewriter "$input_msg" "$d" "$d"
         read option
+        main_option=$option
         case $option in
             1) pcap_log_factory ;;
-            2) pcap_log_hunter ;;
+            2) pcap_threat_detection ;;
             3) hunting_center ;;
             4) exiting ;;
             *) option_error ;; esac; done
@@ -1685,14 +1770,14 @@ if [ "$(id -u)" == "0" ]; then
     echo -e "\n Loading ... \n" && sleep 2
     check_dependencies
     echo -e "\n$(
-    
+
         for ((i = 0; i <= 100; ++i)); do 
             echo -n "/"; done
             echo -e "\n\n $(date) \n"
-            
+
         for ((i = 0; i <= 100; ++i)); do 
             echo -n "/"; done
-            
+
     )\n" >> .logs.log
 
     chmod a+rw ./Results/ && chmod -R a+rw ./Pcaps/ && chmod a+rw ./Databases/
