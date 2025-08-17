@@ -13,7 +13,7 @@ function instalation_error()
 function input_pcap_error() 
 {
 
-	echo -e "${r}\n [x] Error, the file does not exist, try again.\n${d}"
+	echo -e "${r}\n [x] Error, the pcap file does not exist, try again.\n${d}"
 }
 
 #This error occurs when the user provides an unsupported protocol as an argument
@@ -54,4 +54,22 @@ function limit_error()
 {
 
 	echo -e "${r}\n [x] ERROR, It was not possible to configure the system limits.\n${d}"
+}
+
+function input_data_file_error_1()
+{
+
+	echo -e "${r}\n [x] ERROR, the data file does not exist, try again.\n${d}"
+}
+
+function input_data_file_error_2()
+{
+
+	echo -e "${r}\n [x] ERROR, the directories 'Trims' and 'Data' do not exist.\n${d}"
+}
+
+function input_rule_error()
+{
+
+	echo -e "${r}\n [x] ERROR, some of the specified rules are not valid.\n${d}"
 }
